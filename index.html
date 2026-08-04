@@ -1,3 +1,7 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
 <title>O Dia da marmota</title>
 
 <style>
@@ -17,19 +21,25 @@
   * { box-sizing: border-box; }
 
   body {
+    margin: 0;
     background: var(--ground);
     color: var(--fala);
     font-family: var(--serif);
     -webkit-font-smoothing: antialiased;
+    /* tocar na tela pula a animação: o realce cinza do toque piscaria a cada vez */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;   /* mata a espera de 300ms do duplo-toque */
   }
 
   #app {
     max-width: 34rem;
     margin: 0 auto;
     padding: 0 1.25rem 4rem;
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    min-height: 100dvh;   /* no celular a barra do navegador entra e sai do 100vh */
   }
 
   header {
@@ -198,6 +208,27 @@
     border-left-color: transparent;
     background: none;
     color: var(--ink);
+  }
+
+  /* ---- celular ---- */
+  button { -webkit-user-select: none; user-select: none; }
+
+  @media (hover: none) {
+    /* sem mouse o :hover GRUDA na última opção tocada e finge que está aberta */
+    button:hover { border-left-color: transparent; color: var(--ink); background: none; }
+    button.sub:hover { color: var(--dim); }
+    button.grupo.aberto:hover { color: var(--fala); border-left-color: var(--obj); }
+    button.pessoa:hover { color: var(--gente); }
+    button.pessoa.aberto:hover { border-left-color: var(--gente); color: #fff; }
+    /* alvo de dedo: 15px de texto + 0.62rem sobrava curto pro polegar */
+    button { padding-top: 0.8rem; padding-bottom: 0.8rem; }
+  }
+
+  @media (max-width: 24rem) {
+    #app { padding-left: 1rem; padding-right: 1rem; }
+    #clock, #clockBig, .clockVoando { font-size: 1.3rem; }
+    nav .pergunta { font-size: 1.2rem; }
+    .linhaPergunta { gap: 0.9rem; }
   }
 
   #flash {
