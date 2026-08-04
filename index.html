@@ -371,9 +371,20 @@
   }
 
   setInterval(function () { salvaTempo(); manda("jogando"); }, 30000);
-  window.addEventListener("pagehide", function () { salvaTempo(); manda("saiu"); });
+
+  // Sair da página acorda os DOIS eventos (pagehide e visibilitychange), com
+  // milissegundos de diferença — sem essa trava vai linha repetida pra tabela.
+  var jaMandouSaiu = false;
+  function mandaSaiu() {
+    if (jaMandouSaiu) return;
+    jaMandouSaiu = true;
+    salvaTempo();
+    manda("saiu");
+  }
+  window.addEventListener("pagehide", mandaSaiu);
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { salvaTempo(); manda("saiu"); }
+    if (document.hidden) mandaSaiu();
+    else jaMandouSaiu = false;   // voltou pra aba: o próximo sair conta de novo
   });
   var ESTOPIM = 16 * 60 * 100;   // 16 min: o Tony chama o Théo de frouxo
 
