@@ -245,18 +245,45 @@
   // ---- cronômetro de sessão, que sobrevive a fechar e abrir ----
   var CHAVE_MS = "marmota.ms";
   var CHAVE_VEZES = "marmota.vezes";
-  var ABRIU_EM = Date.now();
-  var msAntes = 0, vezes = 1;
+  var vezes = 1;
 
   function guarda(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
   function pega(k) { try { return parseInt(localStorage.getItem(k) || "0", 10) || 0; } catch (e) { return 0; } }
 
-  msAntes = pega(CHAVE_MS);
   vezes = pega(CHAVE_VEZES) + 1;
   guarda(CHAVE_VEZES, vezes);
 
-  function msJogados() { return msAntes + (Date.now() - ABRIU_EM); }
-  function salvaTempo() { guarda(CHAVE_MS, msJogados()); }
+  // O tempo soma em PEDAÇOS desde o último tique, não desde que a página abriu.
+  // Contar desde a abertura fazia duas coisas erradas: contava aba esquecida
+  // aberta como se fosse jogo, e contava o mesmo minuto duas vezes quando havia
+  // recarga ou duas abas (cada uma somava o total antigo mais o próprio tempo).
+  var msAcum = pega(CHAVE_MS);
+  var ultimoTique = Date.now();
+  // guardado à parte de document.hidden: quando o visibilitychange dispara, o
+  // hidden JÁ virou true, e o pedaço que acabou de ser jogado se perderia
+  var visivel = !document.hidden;
+
+  function salvaTempo() {
+    var agora = Date.now();
+    var pedaco = visivel ? (agora - ultimoTique) : 0;
+    ultimoTique = agora;
+    // relê antes de somar: outra aba pode ter somado o pedaço dela nesse meio
+    msAcum = Math.max(msAcum, pega(CHAVE_MS)) + pedaco;
+    guarda(CHAVE_MS, msAcum);
+  }
+
+  function msJogados() {
+    return msAcum + (visivel ? Date.now() - ultimoTique : 0);
+  }
+
+  setInterval(salvaTempo, 5000);
+  // este ouvinte tem que vir ANTES do que manda o placar: fecha o pedaço com o
+  // estado antigo e só então vira a chave
+  document.addEventListener("visibilitychange", function () {
+    salvaTempo();
+    visivel = !document.hidden;
+    ultimoTique = Date.now();
+  });
 
   // id anônimo só pra distinguir aparelhos — nenhum dado pessoal
   var JOGADOR = (function () {
