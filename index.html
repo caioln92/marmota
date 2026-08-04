@@ -282,16 +282,26 @@
       achados: contaDescobertas(), de: TOTAL_DESCOBERTAS,
       relogio: relogio(), pulos: pulos
     };
-    var body = JSON.stringify(d);
+    // O beacon vai como form-urlencoded, NÃO como JSON: application/json
+    // dispara preflight CORS, e sendBeacon não sabe fazer preflight — ele
+    // devolve true (enfileirou) e o navegador descarta calado. O PostgREST
+    // aceita form-urlencoded e trata cada campo como coluna.
+    var form = [];
+    for (var k in d) {
+      if (d.hasOwnProperty(k)) {
+        form.push(encodeURIComponent(k) + "=" + encodeURIComponent(d[k]));
+      }
+    }
+    var corpoForm = form.join("&");
     try {
       // sendBeacon não deixa mandar header, então a chave vai na query
       if (navigator.sendBeacon &&
           navigator.sendBeacon(SB + "?apikey=" + SB_KEY,
-                               new Blob([body], { type: "application/json" }))) return;
+                               new Blob([corpoForm], { type: "application/x-www-form-urlencoded" }))) return;
     } catch (e) {}
     try {
       fetch(SB, {
-        method: "POST", body: body, keepalive: true, mode: "cors",
+        method: "POST", body: JSON.stringify(d), keepalive: true, mode: "cors",
         headers: {
           "content-type": "application/json",
           "apikey": SB_KEY,
