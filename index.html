@@ -370,7 +370,12 @@
     } catch (e) {}
   }
 
-  setInterval(function () { salvaTempo(); manda("jogando"); }, 30000);
+  setInterval(function () {
+    salvaTempo();
+    // aba esquecida aberta não é jogo: sem isso ela vira linha nova a cada 30s
+    // e polui a tabela por horas depois da pessoa ter parado
+    if (visivel) manda("jogando");
+  }, 30000);
 
   // Sair da página acorda os DOIS eventos (pagehide e visibilitychange), com
   // milissegundos de diferença — sem essa trava vai linha repetida pra tabela.
