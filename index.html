@@ -430,7 +430,7 @@
         "Desfeita de um lado só. Você dormiu por cima do cobertor, de roupa e de tênis.",
         "Ninguém dorme assim. Alguém te botou aqui."
       ]},
-      { id: "embaixo", label: "olhar embaixo", custo: 2, sabe: "moeda", pega: "moeda_cama", txt: [
+      { id: "embaixo", label: "olhar embaixo", custo: 2, sabe: "moeda", pega: "moeda_cama", someAposPegar: true, txt: [
         "Poeira, um chinelo sem par, e uma coisa redonda encostada no rodapé.",
         "Uma moeda grossa e pesada, cor de ouro velho. Sem número, sem rosto, só um símbolo que você não reconhece."
       ]}
@@ -448,11 +448,11 @@
       ]}
     ]},
     celular: { nome: "Celular na mesinha", onde: "quarto1", acoes: [
-      { id: "olhar", label: "examinar", custo: 1, txt: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "celular_visto", txt: [
         "Não é o seu. A tela acende sozinha: quarenta e sete por cento, e uma conversa aberta.",
         "Aberta mesmo. Ninguém devia ter deixado isso aberto."
       ]},
-      { id: "ler", label: "ler a conversa", custo: 2, sabe: "lucas_tony", eco: true,
+      { id: "ler", label: "ler a conversa", custo: 2, exige: "celular_visto", sabe: "lucas_tony", eco: true,
         revelaNome: ["lucas", "tony", "marcely"], txt: [
         "{LUCAS}: apaga isso",
         "{TONY}: relaxa ninguem vai ver",
@@ -543,7 +543,7 @@
         "Revólver velho, cabo lascado, carregado.",
         "Está limpo demais pra estar largado num vão de armário há muito tempo."
       ]},
-      { id: "pegar", label: "pegar a arma", custo: 1, sabe: "pegou_arma", pega: "arma", txt: [
+      { id: "pegar", label: "pegar a arma", custo: 1, sabe: "pegou_arma", pega: "arma", someAposPegar: true, txt: [
         "Você pega. É mais pesada do que parece nos filmes.",
         "Enquanto ela estiver com você, não está com quem ia usá-la."
       ]}
@@ -568,10 +568,10 @@
         "Três encaixes redondos, do tamanho exato da moeda que você achou.",
         "Nenhum botão. Nenhum fio. Está morna."
       ]},
-      { id: "encaixar", label: "encaixar as moedas que tiver", custo: 1, encaixa: true }
+      { id: "encaixar", label: "encaixar as moedas que tiver", custo: 1, exige: "maquina", encaixa: true }
     ]},
     facas: { nome: "Facas", onde: "cozinha", acoes: [
-      { id: "pegar", label: "pegar uma", custo: 1, pega: "faca", sabe: "faca", txt: [
+      { id: "pegar", label: "pegar uma", custo: 1, pega: "faca", sabe: "faca", someAposPegar: true, txt: [
         "Você escolhe a maior e enfia no bolso de trás.",
         "Não sabe ainda pra quê. Só sabe que é melhor você com ela do que ela na gaveta."
       ]}
@@ -887,7 +887,7 @@
       "As duas tremem sozinhas. Não é frio.",
       "É alguma coisa saindo do seu corpo, e você não sabe o quê."
     ]},
-    { id: "bolsos", label: "procurar nos bolsos", custo: 1, sabe: "moeda", pega: "moeda_bolso", txt: [
+    { id: "bolsos", label: "procurar nos bolsos", custo: 1, sabe: "moeda", pega: "moeda_bolso", someAposPegar: true, txt: [
       "Chave nenhuma. Carteira nenhuma.",
       "Uma moeda grossa e pesada, cor de ouro velho. Ninguém põe uma coisa dessas no bolso sem lembrar."
     ]},
@@ -1055,14 +1055,19 @@
     var agora = Date.now();
     var dt = agora - ultimoT;
     ultimoT = agora;
-    if (st.acabou || st.pausado || st.cs <= 0) return;
+    if (st.acabou || st.pausado) return;
+    // zerado: espera o jogador terminar de ler — o tick tenta de novo em 50ms
+    if (st.cs <= 0) {
+      if (!ocupado()) morre("tempo");
+      return;
+    }
 
     st.cs -= (dt / 10) * (st.hudAtivo ? LENTO : 1);
-    if (st.cs <= 0) { st.cs = 0; pintaRelogio(); morre("tempo"); return; }
+    if (st.cs <= 0) { st.cs = 0; pintaRelogio(); return; }
     pintaRelogio();
 
-    // o estopim acontece na hora dele, mesmo se o jogador ficar parado
-    if (!st.estourou && st.cs <= ESTOPIM && st.hudAtivo && !ocupado()) estopim();
+    // o estopim acontece na hora dele, mesmo se o jogador nunca tiver agido
+    if (!st.estourou && st.cs <= ESTOPIM && !ocupado()) estopim();
   }, 50);
 
   var ultimaLinha = null;
@@ -1359,6 +1364,8 @@
       grupo(cid, c.nome, "grupo", function () {
         c.acoes.forEach(function (a) {
           if (a.exige && !st.sabe[a.exige]) return;
+          // já está no bolso: a ação de pegar não tem mais o que oferecer
+          if (a.someAposPegar && (st.tem || {})[a.pega]) return;
           caixa.appendChild(botao(a.label, a.custo, function () {
             executa(cid, a);
           }, "sub" + (st.vistos[cid + ":" + a.id] ? " visto" : "")));
@@ -1368,6 +1375,7 @@
 
     grupo("voce", VOCE.nome, "grupo", function () {
       VOCE.acoes.forEach(function (a) {
+        if (a.someAposPegar && (st.tem || {})[a.pega]) return;
         caixa.appendChild(botao(a.label, a.custo, function () {
           executa("voce", a);
         }, "sub" + (st.vistos["voce:" + a.id] ? " visto" : "")));
@@ -1419,6 +1427,36 @@
     if (!st.hudAtivo) { st.hudAtivo = true; voaProCanto(); }
   }
 
+  function poeGente(linhas) {
+    var gente = pessoasAqui().map(function (id) { return nomeDe(id); });
+    if (gente.length === 1) linhas.push("{" + cap(gente[0]) + "} está aqui.");
+    else if (gente.length > 1) {
+      var resto = gente.slice(1).map(function (n) { return "{" + n + "}"; });
+      linhas.push("{" + cap(gente[0]) + "}" +
+        (resto.length > 1 ? ", " + resto.slice(0, -1).join(", ") : "") +
+        " e " + resto[resto.length - 1] + " estão aqui.");
+    }
+    return linhas;
+  }
+
+  // a agenda anda com o relógio: quem entrou ou saiu durante a ação é narrado,
+  // senão a pessoa se materializa no menu sem o texto nunca ter contado
+  function comMovimento(linhas, antesIds) {
+    var agora = pessoasAqui();
+    var extra = linhas.slice();
+    antesIds.forEach(function (id) {
+      if (agora.indexOf(id) < 0 && id !== "theo" && !st.mortos[id]) {
+        extra.push("{" + cap(nomeDe(id)) + "} sai.");
+      }
+    });
+    agora.forEach(function (id) {
+      if (antesIds.indexOf(id) < 0 && id !== "theo") {
+        extra.push("{" + cap(nomeDe(id)) + "} entra.");
+      }
+    });
+    return extra;
+  }
+
   function vaiPara(destino, custo) {
     if (st.acabou) return;
     antesDeAgir();
@@ -1440,14 +1478,7 @@
     var curta = typeof l.curta === "function" ? l.curta() : l.curta;
     var linhas = (jaEsteve && curta ? curta : l.chegada).slice();
 
-    var gente = pessoasAqui().map(function (id) { return nomeDe(id); });
-    if (gente.length === 1) linhas.push("{" + cap(gente[0]) + "} está aqui.");
-    else if (gente.length > 1) {
-      var resto = gente.slice(1).map(function (n) { return "{" + n + "}"; });
-      linhas.push("{" + cap(gente[0]) + "}" +
-        (resto.length > 1 ? ", " + resto.slice(0, -1).join(", ") : "") +
-        " e " + resto[resto.length - 1] + " estão aqui.");
-    }
+    poeGente(linhas);
 
     // o que o estopim deixou pra trás tem presença física, não só promessa
     if (st.mortos["theo"] && destino === "quarto2") {
@@ -1476,6 +1507,25 @@
 
   // texto alternativo quando o estado do mundo desmente o texto fixo
   function textoVivo(grupo, a) {
+    if (grupo === "maquina" && a.id === "olhar" && !st.sabe["moeda"]) {
+      // sem ter achado moeda nenhuma, o jogo não pode apontar a conexão por você
+      return [
+        "Três encaixes redondos e vazios, do tamanho de uma moeda grande.",
+        "Nenhum botão. Nenhum fio. Está morna."
+      ];
+    }
+    if (grupo === "som" && a.id === "ligar" && st.estourou) {
+      if (st.mortos["theo"]) return [
+        "Ainda tem bateria. Entra uma música alta demais pro tamanho da sala.",
+        "Ninguém grita pra abaixar. Ninguém vai gritar mais nada.",
+        "Você desliga."
+      ];
+      if (!st.trancou) return [
+        "Ainda tem bateria. Entra uma música alta demais pro tamanho da sala.",
+        "Você desliga no segundo seguinte, com o coração no ouvido.",
+        "Nessa casa, agora, barulho é endereço."
+      ];
+    }
     if (grupo === "portaQ2" && a.id === "ouvir") {
       if (st.mortos["theo"]) return [
         "Nada.",
@@ -1539,7 +1589,10 @@
       gasta(a.custo);
       var l = LUGARES[st.lugar];
       if (l.revela) l.revela.forEach(function (id) { st.conhece[id] = true; });
-      apresenta(l.chegada.slice(), null, depoisDaAcao);
+      // olhar em volta apresenta o cômodo de verdade: conta como visita e mostra quem está
+      st.visitou = st.visitou || {};
+      st.visitou[st.lugar] = true;
+      apresenta(poeGente(l.chegada.slice()), null, depoisDaAcao);
       return;
     }
 
@@ -1573,6 +1626,7 @@
     var chave = grupo + ":" + a.id;
     var jaViu = st.vistos[chave];
     st.vistos[chave] = true;
+    var antesGente = pessoasAqui();
 
     var vazia = a.txtPrimeira && st.volta < 2;
     var linhas = vazia ? a.txtPrimeira : a.txt;
@@ -1591,27 +1645,39 @@
 
     gasta(a.custo);
 
-    if (jaViu) apresenta([linhas[linhas.length - 1]], "eco", depoisDaAcao, true);
-    else apresenta(linhas, a.eco ? "eco" : null, depoisDaAcao);
+    if (jaViu) apresenta(comMovimento([linhas[linhas.length - 1]], antesGente), "eco", depoisDaAcao, true);
+    else apresenta(comMovimento(linhas, antesGente), a.eco ? "eco" : null, depoisDaAcao);
+  }
+
+  // o menu pode estar aberto há tempo — a pessoa clicada talvez já tenha saído
+  function seFoiEmbora(pid) {
+    if (ondeEsta(pid) === st.lugar) return false;
+    st.aberto = null;
+    apresenta(["Você se vira pra falar — e " + nomeDe(pid) + " já não está mais aqui."],
+              "eco", depoisDaAcao, true);
+    return true;
   }
 
   function executaPessoa(pid, tipo, linhas) {
     if (st.acabou) return;
     antesDeAgir();
+    if (seFoiEmbora(pid)) return;
     var chave = "p:" + pid + ":" + tipo;
     var jaViu = st.vistos[chave];
     st.vistos[chave] = true;
     st.sabe["viu_" + pid] = true;
+    var antesGente = pessoasAqui();
     var rn = PESSOAS[pid].revelaNome;
     if (tipo === "falar" && rn) rn.forEach(function (o) { st.sabe["nome_" + o] = true; });
     gasta(1);
-    if (jaViu) apresenta([linhas[linhas.length - 1]], "eco", depoisDaAcao, true);
-    else apresenta(linhas, null, depoisDaAcao);
+    if (jaViu) apresenta(comMovimento([linhas[linhas.length - 1]], antesGente), "eco", depoisDaAcao, true);
+    else apresenta(comMovimento(linhas, antesGente), null, depoisDaAcao);
   }
 
   function executaNome(pid) {
     if (st.acabou) return;
     antesDeAgir();
+    if (seFoiEmbora(pid)) return;
     var p = PESSOAS[pid];
     st.sabe["nome_" + pid] = true;
     st.vistos["p:" + pid + ":nome"] = true;
@@ -1637,16 +1703,23 @@
   function executaAssunto(pid, a) {
     if (st.acabou) return;
     antesDeAgir();
-    st.vistos["a:" + pid + ":" + a.id] = true;
+    if (seFoiEmbora(pid)) return;
+    var chave = "a:" + pid + ":" + a.id;
+    var jaViu = st.vistos[chave];
+    st.vistos[chave] = true;
     st.sabe["falou_" + a.id] = true;
     if (a.gatilho) st.sabe[a.gatilho] = true;
+    var antesGente = pessoasAqui();
     // só a resposta que FALA o nome revela o nome
     if (a.nomes && a.nomes[pid]) {
       a.nomes[pid].forEach(function (id) { st.sabe["nome_" + id] = true; });
     }
     if (a.dá && pid === "jennifer") { st.tem = (st.tem || {}); st.tem["moeda_jennifer"] = true; }
     gasta(a.custo);
-    apresenta(a.resp[pid], null, depoisDaAcao);
+    var resp = a.resp[pid];
+    // repetir o assunto ecoa a última fala em vez de reencenar a cena inteira
+    if (jaViu) apresenta(comMovimento([resp[resp.length - 1]], antesGente), "eco", depoisDaAcao, true);
+    else apresenta(comMovimento(resp, antesGente), null, depoisDaAcao);
   }
 
   function quantasMoedas() {
