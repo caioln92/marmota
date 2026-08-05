@@ -733,12 +733,13 @@
   // ================= PESSOAS =================
   // agenda em minutos restantes: [de, até, lugar]
 
-  // apelidos em minúscula: entram no meio de frase ("fulano e beltrano estão aqui");
-  // o motor capitaliza quando é botão ou começo de frase.
+  // apelidos SEM artigo: o motor põe "um/uma" enquanto a pessoa é estranha e
+  // "o/a" depois que o jogador já a viu — artigo definido pressupõe conhecer.
+  // Minúscula porque entram no meio de frase; cap() sobe no botão/início.
   // olharEm: o observar muda com o cômodo — texto fixo mentia quando a pessoa andava.
   var PESSOAS = {
     theo: {
-      nome: "Théo", apelido: "o cara de cueca",
+      nome: "Théo", apelido: "cara de cueca",
       agenda: [[30, 16, "quarto2"]],
       olhar: [
         "Sentado no chão, de cueca, encostado na parede.",
@@ -752,7 +753,7 @@
       ]
     },
     jennifer: {
-      nome: "Jennifer", apelido: "a moça que mexe em tudo",
+      nome: "Jennifer", apelido: "moça que mexe em tudo", fem: true,
       agenda: [[30, 24, "cozinha"], [24, 16, "sala"]],
       olhar: [
         "Comendo bolo direto da forma, sem prato, olhando pro nada.",
@@ -770,7 +771,7 @@
       ]
     },
     lucas: {
-      nome: "Lucas", apelido: "o cara de cabelo molhado",
+      nome: "Lucas", apelido: "cara de cabelo molhado",
       agenda: [[30, 18, "banheiro"], [18, 16, "cozinha"]],
       olhar: [
         "Cabelo molhado, camisa amassada na mão. Fecha a porta do banheiro atrás de si rápido demais.",
@@ -792,7 +793,7 @@
       ]
     },
     tony: {
-      nome: "Tony", apelido: "o cara sem camisa",
+      nome: "Tony", apelido: "cara sem camisa",
       agenda: [[30, 18, "banheiro"], [18, 16, "quarto2"]],
       olhar: [
         "Sem camisa, ombro apoiado no batente, sorrindo de um jeito que não chega no olho.",
@@ -810,7 +811,7 @@
       ]
     },
     marcely: {
-      nome: "Marcely", apelido: "a moça inquieta",
+      nome: "Marcely", apelido: "moça inquieta", fem: true,
       agenda: [[30, 18, "sala"], [18, 16, "banheiro"]],
       olhar: [
         "Sentada na ponta do sofá, joelho batendo, olhando pro corredor toda vez que alguém passa.",
@@ -1242,16 +1243,25 @@
   // cap() sobe a primeira letra quando é botão ou começo de frase
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
+  // "uma moça" enquanto estranha, "a moça" depois que o jogador já a viu:
+  // artigo definido pressupõe conhecer a pessoa
   function nomeDe(id) {
     var p = PESSOAS[id];
-    return st.sabe["nome_" + id] ? p.nome : p.apelido;
+    if (st.sabe["nome_" + id]) return p.nome;
+    var art = st.sabe["viu_" + id] ? (p.fem ? "a " : "o ") : (p.fem ? "uma " : "um ");
+    return art + p.apelido;
   }
 
   // pra cenas com gente que o jogador talvez nunca viu: nome > apelido > genérico
   function quemE(id, generico) {
     if (st.sabe["nome_" + id]) return PESSOAS[id].nome;
-    if (st.sabe["viu_" + id]) return PESSOAS[id].apelido;
+    if (st.sabe["viu_" + id]) return (PESSOAS[id].fem ? "a " : "o ") + PESSOAS[id].apelido;
     return generico;
+  }
+
+  // aparecer num texto conta como ter sido visto — o artigo muda a partir daqui
+  function marcaVistos(ids) {
+    ids.forEach(function (id) { st.sabe["viu_" + id] = true; });
   }
 
   function ondeEsta(id) {
@@ -1452,7 +1462,8 @@
   }
 
   function poeGente(linhas) {
-    var gente = pessoasAqui().map(function (id) { return nomeDe(id); });
+    var ids = pessoasAqui();
+    var gente = ids.map(function (id) { return nomeDe(id); });
     if (gente.length === 1) linhas.push("{" + cap(gente[0]) + "} está aqui.");
     else if (gente.length > 1) {
       var resto = gente.slice(1).map(function (n) { return "{" + n + "}"; });
@@ -1460,6 +1471,7 @@
         (resto.length > 1 ? ", " + resto.slice(0, -1).join(", ") : "") +
         " e " + resto[resto.length - 1] + " estão aqui.");
     }
+    marcaVistos(ids);   // depois de montar: a frase atual ainda usa "um/uma"
     return linhas;
   }
 
@@ -1468,16 +1480,20 @@
   function comMovimento(linhas, antesIds) {
     var agora = pessoasAqui();
     var extra = linhas.slice();
+    var vistos = [];
     antesIds.forEach(function (id) {
       if (agora.indexOf(id) < 0 && id !== "theo" && !st.mortos[id]) {
         extra.push("{" + cap(nomeDe(id)) + "} sai.");
+        vistos.push(id);
       }
     });
     agora.forEach(function (id) {
       if (antesIds.indexOf(id) < 0 && id !== "theo") {
         extra.push("{" + cap(nomeDe(id)) + "} entra.");
+        vistos.push(id);
       }
     });
+    marcaVistos(vistos);
     return extra;
   }
 
@@ -1506,7 +1522,7 @@
 
     // o que o estopim deixou pra trás tem presença física, não só promessa
     if (st.mortos["theo"] && destino === "quarto2") {
-      linhas.push({ t: quemE("theo", "O dono do quack") + " está no chão, entre o armário e a cama, do jeito que ficou. Você não chega mais perto.", c: "forte" });
+      linhas.push({ t: cap(quemE("theo", "o dono do quack")) + " está no chão, entre o armário e a cama, do jeito que ficou. Você não chega mais perto.", c: "forte" });
     }
     if (st.mortos["tony"] && st.mortos["theo"] && destino === st.tonyParadoEm) {
       linhas.push(cap(quemE("tony", "o homem da faca")) +
@@ -1642,6 +1658,7 @@
       } else {
         linhas.push("Não dá pra ver ninguém daqui. As vozes vinham de algum lugar mais fundo.");
       }
+      marcaVistos(la);   // espiar também apresenta
       linhas.push("Pra ver o resto você vai ter que entrar.");
       apresenta(linhas, null, depoisDaAcao);
       return;
