@@ -515,6 +515,13 @@
       { id: "vasculhar", label: "vasculhar entre as almofadas", custo: 2, txt: [
         "Moeda de um real, um isqueiro, uma meia.",
         "E um brinco que não é de ninguém que você viu até agora."
+      ]},
+      // a promessa do examinar agora tem anzol: o sofá é a segunda tranca da casa
+      { id: "arrastar", label: "arrastar até a porta do quarto 2", custo: 3,
+        exige: "sofa_trava", exigeConhece: "portaQ2", trava: true, txt: [
+        "Você tira a manta, firma o pé e empurra. O sofá atravessa a sala gemendo e entala na boca do corredor. Você empurra mais.",
+        "Ele encosta na porta do quarto 2 e para, como se tivesse nascido ali. Ninguém abre isso por dentro.",
+        "O quack continua, abafado, no mesmo ritmo de sempre. Ele nem percebeu."
       ]}
     ]},
     portaRua: { nome: "Porta da rua", onde: "sala", acoes: [
@@ -740,7 +747,8 @@
   var PESSOAS = {
     theo: {
       nome: "Théo", apelido: "cara de cueca",
-      agenda: [[30, 16, "quarto2"]],
+      // até 0: o pato não sai sozinho — quem o tira do quarto é o estopim (theoLugar)
+      agenda: [[30, 0, "quarto2"]],
       olhar: [
         "Sentado no chão, de cueca, encostado na parede.",
         "Ele te olha, abre os braços devagar e faz um som curto com a boca. Quack.",
@@ -1092,7 +1100,7 @@
     pintaRelogio();
 
     // o estopim acontece na hora dele, mesmo se o jogador nunca tiver agido
-    if (!st.estourou && st.cs <= ESTOPIM && !ocupado()) estopim();
+    if (!ocupado()) tentaEstopim();
   }, 50);
 
   var ultimaLinha = null;
@@ -1267,6 +1275,7 @@
   function ondeEsta(id) {
     var p = PESSOAS[id];
     if (st.mortos[id]) return null;
+    if ((st.fugiu || {})[id]) return null;   // quem viu você matar não volta
     if (id === "theo" && st.estourou) return st.theoLugar || null;
     var m = minutos();
     for (var i = 0; i < p.agenda.length; i++) {
@@ -1278,8 +1287,9 @@
 
   function pessoasAqui() {
     return Object.keys(PESSOAS).filter(function (id) {
-      // depois do estopim o Théo não é gente pra conversar, é ameaça
-      if (id === "theo" && st.estourou) return false;
+      // caçando (theoLugar setado), o Théo não é gente pra conversar, é ameaça;
+      // sem estopim ele segue no quarto, de pato, conversável
+      if (id === "theo" && st.theoLugar) return false;
       return ondeEsta(id) === st.lugar;
     });
   }
@@ -1390,6 +1400,17 @@
             executaAssunto(pid, a);
           }, "sub" + (st.vistos["a:" + pid + ":" + a.id] ? " visto" : "")));
         });
+        // com uma arma na mão, toda conversa tem uma saída que não volta
+        if ((st.tem || {}).faca) {
+          caixa.appendChild(botao("atacar com a faca", 1, function () {
+            mata(pid, "faca");
+          }, "sub"));
+        }
+        if ((st.tem || {}).arma) {
+          caixa.appendChild(botao("atirar " + (pes.fem ? "nela" : "nele"), 1, function () {
+            mata(pid, "arma");
+          }, "sub"));
+        }
       });
     });
 
@@ -1398,8 +1419,11 @@
       grupo(cid, c.nome, "grupo", function () {
         c.acoes.forEach(function (a) {
           if (a.exige && !st.sabe[a.exige]) return;
+          if (a.exigeConhece && !st.conhece[a.exigeConhece]) return;
           // já está no bolso: a ação de pegar não tem mais o que oferecer
           if (a.someAposPegar && (st.tem || {})[a.pega]) return;
+          // já tem tranca na porta (ou ninguém vivo lá dentro) — trancar não acrescenta nada
+          if (a.trava && (st.trancou || st.mortos["theo"])) return;
           caixa.appendChild(botao(a.label, a.custo, function () {
             executa(cid, a);
           }, "sub" + (st.vistos[cid + ":" + a.id] ? " visto" : "")));
@@ -1442,7 +1466,7 @@
 
   function depoisDaAcao() {
     if (st.cs <= 0) { morre("tempo"); return; }
-    if (st.cs <= ESTOPIM && !st.estourou) { estopim(); return; }
+    if (tentaEstopim()) return;
     if (st.estourou && !st.pegou && st.theoLugar === st.lugar) {
       st.pegou = true; theoTeAcha(); return;
     }
@@ -1502,7 +1526,9 @@
     antesDeAgir();
     if (destino === "quarto2" && st.trancou) {
       gasta(custo);
-      apresenta(["A cadeira está encaixada na maçaneta. Você mesmo botou ali.",
+      apresenta([st.trancouCom === "sofa"
+                   ? "O sofá está entalado contra a porta, do jeito que você deixou. Nem você abre mais isso."
+                   : "A cadeira está encaixada na maçaneta. Você mesmo botou ali.",
                  "Do lado de dentro, o quack continua."], null, depoisDaAcao);
       return;
     }
@@ -1520,8 +1546,10 @@
 
     poeGente(linhas);
 
-    // o que o estopim deixou pra trás tem presença física, não só promessa
-    if (st.mortos["theo"] && destino === "quarto2") {
+    // o que o estopim deixou pra trás tem presença física, não só promessa.
+    // (os blocos do estopim só valem quando NÃO foi o jogador quem matou — corpoEm)
+    var corpos = st.corpoEm || {};
+    if (st.mortos["theo"] && !corpos["theo"] && destino === "quarto2") {
       linhas.push({ t: cap(quemE("theo", "o dono do quack")) + " está no chão, entre o armário e a cama, do jeito que ficou. Você não chega mais perto.", c: "forte" });
     }
     if (st.mortos["tony"] && st.mortos["theo"] && destino === st.tonyParadoEm) {
@@ -1530,16 +1558,26 @@
           ? " continua sentado na beirada da cama. Não olha pra você. Não olha pra nada."
           : " está sentado no chão, encostado na parede, com a faca ainda na mão. Não olha pra você. Não olha pra nada."));
     }
-    if (st.mortos["tony"] && !st.mortos["theo"] && destino === "quarto2") {
+    if (st.estourou && st.mortos["tony"] && !corpos["tony"] && !st.mortos["theo"] && destino === "quarto2") {
       linhas.push({ t: "O corpo do " + quemE("tony", "outro") + " está caído perto da cama, com a mão fechada em volta de uma faca que não deu tempo de abrir.", c: "forte" });
     }
-    // a casa esvazia depois do estopim — uma vez por volta o texto reconhece isso
-    if (st.estourou && !gente.length && !st.avisoVazio &&
+    // corpos que VOCÊ deixou ficam onde você os deixou
+    Object.keys(corpos).forEach(function (pid) {
+      if (corpos[pid] !== destino) return;
+      var pp = PESSOAS[pid];
+      linhas.push({ t: "O corpo d" + (pp.fem ? "a " : "o ") +
+        (st.sabe["nome_" + pid] ? pp.nome : pp.apelido) +
+        " está onde você deixou. A casa finge junto com você que não está.", c: "forte" });
+    });
+    // a casa esvazia depois do estopim (ou do que você fez) — dito uma vez por volta
+    if ((st.estourou || st.semEstopim) && !pessoasAqui().length && !st.avisoVazio &&
         destino !== "quarto2" && destino !== "corredorQ2") {
       st.avisoVazio = true;
       linhas.push(st.trancou
         ? "Ninguém. Só o quack, abafado, no fundo da casa — e você."
-        : "Ninguém. A casa depois do tiro é outra casa: os mesmos móveis, o dobro do tamanho, nenhuma voz.");
+        : (st.semEstopim
+          ? "Ninguém. Quem sobrou não ficou pra descobrir se era o próximo."
+          : "Ninguém. A casa depois do tiro é outra casa: os mesmos móveis, o dobro do tamanho, nenhuma voz."));
     }
 
     apresenta(linhas, null, depoisDaAcao);
@@ -1682,7 +1720,10 @@
     if (a.revelaNome && !vazia) {
       a.revelaNome.forEach(function (id) { st.sabe["nome_" + id] = true; });
     }
-    if (a.trava) st.trancou = true;   // físico: não atravessa o loop
+    if (a.trava) {
+      st.trancou = true;   // físico: não atravessa o loop
+      st.trancouCom = grupo === "sofa" ? "sofa" : "cadeira";
+    }
 
     gasta(a.custo);
 
@@ -1791,7 +1832,74 @@
     ], null, placar);
   }
 
+  // ---- matar com a faca ou a arma
+
+  function cenaMatar(pid, com) {
+    var quem = nomeDe(pid);
+    if (pid === "theo") {
+      return [
+        { t: "Ele te vê chegando com aquilo na mão e não recua." },
+        { t: "Abre os braços. Acha que é brincadeira. Acha que você é amigo dele — e ele tem razão." },
+        { t: "— Quack — ele diz, feliz." },
+        { t: "Você faz mesmo assim.", c: "forte" },
+        { t: "O som que sai dele no fim não é de pato. É de gente." }
+      ];
+    }
+    if (com === "arma") {
+      return [
+        { t: "Você levanta a arma e o cômodo inteiro muda de tamanho." },
+        { t: "— Ei. Ei, calma—" },
+        { t: "O tiro engole a frase.", c: "forte" },
+        { t: cap(quem) + " cai de um jeito que filme nenhum mostra: sem pose, sem última palavra. Como roupa escorregando do cabide." }
+      ];
+    }
+    return [
+      { t: "Você tira a faca do bolso de trás. " + cap(quem) + " ainda tem tempo de fazer uma cara de dúvida — isso é sério? — e depois não tem mais tempo de nada." },
+      { t: "É rápido. Não é limpo.", c: "forte" },
+      { t: "O barulho que o corpo faz no chão é o pior som da casa até agora." }
+    ];
+  }
+
+  function mata(pid, com) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (seFoiEmbora(pid)) return;
+    gasta(1);
+    st.sabe["viu_" + pid] = true;
+    st.mortos[pid] = true;
+    st.corpoEm = st.corpoEm || {};
+    st.corpoEm[pid] = st.lugar;
+    st.fugiu = st.fugiu || {};
+
+    var linhas = cenaMatar(pid, com).slice();
+    pessoasAqui().forEach(function (o) {
+      st.sabe["viu_" + o] = true;
+      if (o === "theo") {
+        // o pato não entende morte — não foge, não grita
+        linhas.push("O cara de cueca olha o que você fez, inclina a cabeça, e faz um quack baixinho, confuso.");
+        return;
+      }
+      st.fugiu[o] = true;
+      linhas.push({ t: "{" + cap(nomeDe(o)) + "} grita uma vez e some pela casa. Você ouve uma porta bater. Essa pessoa não volta.", c: "forte" });
+    });
+    apresenta(linhas, null, depoisDaAcao);
+  }
+
   // ---- o estopim das 16
+
+  // o tiro das 16:00 precisa dos dois vivos e presentes: sem provocador
+  // (Tony) ou sem provocado (Théo), aquela briga simplesmente nunca acontece
+  function tentaEstopim() {
+    if (st.estourou || st.semEstopim) return false;
+    if (st.cs > ESTOPIM) return false;
+    var f = st.fugiu || {};
+    if (st.mortos["tony"] || st.mortos["theo"] || f["tony"] || f["theo"]) {
+      st.semEstopim = true;
+      return false;
+    }
+    estopim();
+    return true;
+  }
 
   function estopim() {
     st.estourou = true;
@@ -1844,7 +1952,7 @@
       st.sabe["nome_theo"] = true;
       apresenta([
         { t: "Passos pesados até o fim do corredor. A maçaneta do quarto 2 desce, sobe, desce de novo." },
-        { t: "Um baque. A cadeira range e aguenta." },
+        { t: st.trancouCom === "sofa" ? "Um baque. O sofá nem se move." : "Um baque. A cadeira range e aguenta." },
         { t: cap(quemE("tony", "alguém")) + " está do lado de fora da porta que você travou, e está perdendo a cabeça: — Abre! Abre essa porra, {Théo}! Cê acha que eu tô brincando?", c: "forte" },
         { t: "A porta aguenta cada chute. Lá dentro, o quack responde, calmo, no mesmo ritmo de sempre." },
         { t: "Demora. Mas uma hora os chutes cansam, e os passos vão embora xingando a casa inteira." }
@@ -1896,9 +2004,11 @@
           p.className = "pergunta colado urgente";
           p.textContent = "O que você faz?";
           elOpcoes.appendChild(p);
-          [["- Falar com ele", "theo_falar"],
-           ["- Empurrar e correr", "theo_corre"],
-           ["- Ficar parado", "theo_para"]].forEach(function (par) {
+          var ops = [["- Falar com ele", "theo_falar"],
+                     ["- Empurrar e correr", "theo_corre"],
+                     ["- Ficar parado", "theo_para"]];
+          if ((st.tem || {}).faca) ops.push(["- Partir pra cima com a faca", "theo_faca"]);
+          ops.forEach(function (par) {
             elOpcoes.appendChild(botao(par[0], null, function () { morre(par[1]); }, "grupo"));
           });
         });
@@ -1945,6 +2055,11 @@
       { t: "— Quack — ele diz, baixinho, como quem pede desculpa." },
       { t: "Você não escuta o tiro.", c: "forte" }
     ],
+    theo_faca: [
+      { t: "Você vem com a faca. Ele para de dançar e te olha com uma curiosidade quase científica." },
+      { t: "É física, no fim: um revólver responde antes de qualquer faca perguntar.", c: "forte" },
+      { t: "O clarão do cano é a última luz dessa volta." }
+    ],
     tempo: [
       { t: "00:00:00.", c: "forte" },
       { t: "O número para de cair, e o silêncio que vem depois é diferente de todos os silêncios da casa." },
@@ -1975,6 +2090,7 @@
       theo_falar: "Ele para de dançar.",
       theo_corre: "Ele para de dançar.",
       theo_para: "Ele para de dançar.",
+      theo_faca: "Ele para de dançar.",
       tempo: "O relógio chega no fim.",
       dormiu: "Você apagou."
     }[causa] || "";
@@ -1991,6 +2107,10 @@
       st.morrendo = false;
       st.avisoVazio = false;
       st.tonyParadoEm = null;
+      st.trancouCom = null;
+      st.semEstopim = false;
+      st.fugiu = {};
+      st.corpoEm = {};
       st.mortos = {};
       st.dormiu = 0;
       st.vistos = {};
