@@ -1,0 +1,2173 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>MARMOTA — FLUXO (esqueleto)</title>
+<style>
+  #tarjaFluxo {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99;
+    background: #7a1f1f; color: #fff; font: 700 0.65rem/1.6 monospace;
+    text-align: center; letter-spacing: 0.2em; pointer-events: none;
+  }
+  * { transition: none !important; animation: none !important; }
+</style>
+
+<style>
+  :root {
+    --ground: #0a0a0b;
+    --fala: #efebe3;
+    --ink: #a29c94;
+    --dim: #5f5b56;
+    --rule: #1c1b1a;
+    --alarm: #c0392b;
+    --obj: #6f9fc4;
+    --gente: #c9a86a;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--fala);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+    /* tocar na tela pula a animação: o realce cinza do toque piscaria a cada vez */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;   /* mata a espera de 300ms do duplo-toque */
+  }
+
+  #app {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 4rem;
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;   /* no celular a barra do navegador entra e sai do 100vh */
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--ground);
+    padding: 1.25rem 0 0.9rem;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  #clock {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    transition: color 0.6s ease;
+  }
+  #clock.baixo { color: var(--alarm); }
+  #clock.escondido { opacity: 0; }
+
+  #onde {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: right;
+    line-height: 1.6;
+  }
+  #onde b { color: var(--ink); font-weight: 400; }
+
+  .linhaPergunta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+  .linhaPergunta .pergunta { flex: 1; }
+
+  #clockBig, .clockVoando {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--fala);
+    white-space: nowrap;
+  }
+  .clockVoando {
+    position: fixed;
+    z-index: 40;
+    transform-origin: left top;
+    pointer-events: none;
+  }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+  main:empty { display: none; }
+  main p { margin: 0; }
+  main p.eco { color: var(--ink); font-style: italic; }
+  main p.forte { color: #fff; }
+
+  main .obj { color: var(--obj); }
+  main .quem { color: var(--gente); }
+
+  .cursor {
+    display: inline-block;
+    width: 0.5em;
+    margin-left: 0.06em;
+    border-bottom: 2px solid currentColor;
+    animation: pisca 1s steps(1) infinite;
+  }
+  @keyframes pisca { 50% { opacity: 0; } }
+
+  nav { display: flex; flex-direction: column; flex: 1; }
+  nav:empty { display: none; }
+
+  nav .pergunta {
+    font-family: var(--serif);
+    font-size: 1.3125rem;
+    line-height: 1.3;
+    color: var(--fala);
+    padding: 3.25rem 0 1.4rem;
+    min-height: 2.4rem;
+    transition: color 0.6s ease, padding 380ms cubic-bezier(.4,0,.2,1);
+  }
+  nav .pergunta.urgente { color: var(--alarm); }
+  nav .pergunta.colado { padding-top: 0.25rem; }
+
+  #botoes {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    transition: opacity 300ms ease;
+  }
+  #botoes.entrando { opacity: 0; }
+
+  main.saindo { overflow: hidden; }
+
+  button {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-left: 2px solid transparent;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.9375rem;
+    text-align: left;
+    padding: 0.62rem 0.5rem 0.62rem 0.7rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    line-height: 1.35;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+
+  button:hover, button:focus-visible {
+    border-left-color: var(--fala);
+    color: var(--fala);
+    background: #131312;
+    outline: none;
+  }
+
+  button.grupo.aberto { color: var(--fala); border-left-color: var(--obj); }
+  button.pessoa { color: var(--gente); }
+  button.pessoa.aberto { border-left-color: var(--gente); color: #fff; }
+
+  button.sub {
+    padding-left: 2.1rem;
+    font-size: 0.875rem;
+    color: var(--dim);
+  }
+  button.sub:hover, button.sub:focus-visible { color: var(--fala); }
+  button.sub.visto { color: #4a4744; }
+
+  button .custo {
+    color: var(--dim);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  button.sub.visto .custo { color: #4a4744; }
+
+  button.reler {
+    margin-top: auto;
+    padding-top: 2.2rem;
+    color: var(--dim);
+    font-size: 0.8rem;
+    border-left-color: transparent;
+  }
+  button.reler:hover, button.reler:focus-visible {
+    border-left-color: transparent;
+    background: none;
+    color: var(--ink);
+  }
+
+  /* ---- celular ---- */
+  button { -webkit-user-select: none; user-select: none; }
+
+  @media (hover: none) {
+    /* sem mouse o :hover GRUDA na última opção tocada e finge que está aberta */
+    button:hover { border-left-color: transparent; color: var(--ink); background: none; }
+    button.sub:hover { color: var(--dim); }
+    button.grupo.aberto:hover { color: var(--fala); border-left-color: var(--obj); }
+    button.pessoa:hover { color: var(--gente); }
+    button.pessoa.aberto:hover { border-left-color: var(--gente); color: #fff; }
+    /* alvo de dedo: 15px de texto + 0.62rem sobrava curto pro polegar */
+    button { padding-top: 0.8rem; padding-bottom: 0.8rem; }
+  }
+
+  @media (max-width: 24rem) {
+    #app { padding-left: 1rem; padding-right: 1rem; }
+    #clock, #clockBig, .clockVoando { font-size: 1.3rem; }
+    nav .pergunta { font-size: 1.2rem; }
+    .linhaPergunta { gap: 0.9rem; }
+  }
+
+  #flash {
+    position: fixed; inset: 0; background: #fff;
+    opacity: 0; pointer-events: none; z-index: 50;
+  }
+  #flash.bate { animation: clarao 900ms ease-out; }
+  @keyframes clarao { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #flash.bate { animation-duration: 1ms; }
+    .cursor { animation: none; }
+    * { transition: none !important; }
+  }
+
+  .placar {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    line-height: 2;
+    color: var(--ink);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 1rem 0;
+    margin-top: 0.5rem;
+  }
+  .placar b { color: var(--fala); font-weight: 400; }
+</style>
+
+<div id="tarjaFluxo">MODO FLUXO — SEM TEXTO, SEM ANIMAÇÃO — NÃO É O JOGO</div>
+<div id="app">
+  <header>
+    <div id="clock">30:00:00</div>
+    <div id="onde"><b>volta 1</b></div>
+  </header>
+  <main id="texto"></main>
+  <nav id="opcoes"></nav>
+</div>
+<div id="flash"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== MODO FLUXO: clone estrutural pra testar o grafo do jogo =====
+  // sem animação, sem prosa (só efeitos), sem telemetria, storage separado
+  var TOTAL = 30 * 60 * 100;
+  var LENTO = 0.1;
+  // ---- cronômetro de sessão, que sobrevive a fechar e abrir ----
+  var CHAVE_MS = "marmotafluxo.ms";
+  var CHAVE_VEZES = "marmotafluxo.vezes";
+  var vezes = 1;
+
+  function guarda(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function pega(k) { try { return parseInt(localStorage.getItem(k) || "0", 10) || 0; } catch (e) { return 0; } }
+
+  vezes = pega(CHAVE_VEZES) + 1;
+  guarda(CHAVE_VEZES, vezes);
+
+  // O tempo soma em PEDAÇOS desde o último tique, não desde que a página abriu.
+  // Contar desde a abertura fazia duas coisas erradas: contava aba esquecida
+  // aberta como se fosse jogo, e contava o mesmo minuto duas vezes quando havia
+  // recarga ou duas abas (cada uma somava o total antigo mais o próprio tempo).
+  var msAcum = pega(CHAVE_MS);
+  var ultimoTique = Date.now();
+  // guardado à parte de document.hidden: quando o visibilitychange dispara, o
+  // hidden JÁ virou true, e o pedaço que acabou de ser jogado se perderia
+  var visivel = !document.hidden;
+
+  function salvaTempo() {
+    var agora = Date.now();
+    var pedaco = visivel ? (agora - ultimoTique) : 0;
+    ultimoTique = agora;
+    // relê antes de somar: outra aba pode ter somado o pedaço dela nesse meio
+    msAcum = Math.max(msAcum, pega(CHAVE_MS)) + pedaco;
+    guarda(CHAVE_MS, msAcum);
+  }
+
+  function msJogados() {
+    return msAcum + (visivel ? Date.now() - ultimoTique : 0);
+  }
+
+  setInterval(function () { salvaTempo(); salvaJogo(); }, 5000);
+  // este ouvinte tem que vir ANTES do que manda o placar: fecha o pedaço com o
+  // estado antigo e só então vira a chave
+  document.addEventListener("visibilitychange", function () {
+    salvaTempo();
+    visivel = !document.hidden;
+    ultimoTique = Date.now();
+  });
+
+  // ---- o conhecimento sobrevive a fechar o jogo, igual sobrevive ao loop ----
+  // fechar é só mais um jeito de morrer: sabe/conhece/volta ficam, o físico não
+  var CHAVE_SAVE = "marmotafluxo.save";
+  var jogoComecou = false;
+
+  function salvaJogo() {
+    if (!jogoComecou || st.acabou) return;
+    try {
+      localStorage.setItem(CHAVE_SAVE, JSON.stringify(
+        { v: 1, volta: st.volta, sabe: st.sabe, conhece: st.conhece }));
+    } catch (e) {}
+  }
+  function apagaSave() { try { localStorage.removeItem(CHAVE_SAVE); } catch (e) {} }
+  function leSave() {
+    try {
+      var s = JSON.parse(localStorage.getItem(CHAVE_SAVE) || "null");
+      if (s && s.v === 1 && s.sabe && s.conhece) return s;
+    } catch (e) {}
+    return null;
+  }
+
+  // id anônimo só pra distinguir aparelhos — nenhum dado pessoal
+  var JOGADOR = (function () {
+    try {
+      var v = localStorage.getItem("marmotafluxo.id");
+      if (!v) { v = Math.random().toString(36).slice(2, 8); localStorage.setItem("marmotafluxo.id", v); }
+      return v;
+    } catch (e) { return "anon"; }
+  })();
+
+  var pulos = 0;
+
+  // Supabase (Goytacá Games). A chave é publishable — pública por design.
+  // Quem protege é a RLS: a tabela aceita INSERT e não tem política de SELECT.
+  var SB = "https://gwghnmgfctjuvzhnwpsg.supabase.co/rest/v1/marmota_placares";
+  var SB_KEY = "sb_publishable_M4hJiKOmcgwaxaaSk50r-g_ozRFkiW1";
+
+  function manda(tipo) {
+    return;   // MODO FLUXO: nada sai daqui
+    var d = {
+      jogador: JOGADOR, tipo: tipo,
+      seg: Math.round(msJogados() / 1000), vezes: vezes,
+      volta: st.volta, lugar: st.lugar, acoes: st.acoes,
+      achados: contaDescobertas(), de: TOTAL_DESCOBERTAS,
+      relogio: relogio(), pulos: pulos
+    };
+    // O beacon vai como form-urlencoded, NÃO como JSON: application/json
+    // dispara preflight CORS, e sendBeacon não sabe fazer preflight — ele
+    // devolve true (enfileirou) e o navegador descarta calado. O PostgREST
+    // aceita form-urlencoded e trata cada campo como coluna.
+    var form = [];
+    for (var k in d) {
+      if (d.hasOwnProperty(k)) {
+        form.push(encodeURIComponent(k) + "=" + encodeURIComponent(d[k]));
+      }
+    }
+    var corpoForm = form.join("&");
+    try {
+      // sendBeacon não deixa mandar header, então a chave vai na query
+      if (navigator.sendBeacon &&
+          navigator.sendBeacon(SB + "?apikey=" + SB_KEY,
+                               new Blob([corpoForm], { type: "application/x-www-form-urlencoded" }))) return;
+    } catch (e) {}
+    try {
+      fetch(SB, {
+        method: "POST", body: JSON.stringify(d), keepalive: true, mode: "cors",
+        headers: {
+          "content-type": "application/json",
+          "apikey": SB_KEY,
+          "authorization": "Bearer " + SB_KEY,
+          "prefer": "return=minimal"
+        }
+      });
+    } catch (e) {}
+  }
+
+  setInterval(function () {
+    salvaTempo();
+    // aba esquecida aberta não é jogo: sem isso ela vira linha nova a cada 30s
+    // e polui a tabela por horas depois da pessoa ter parado
+    if (visivel) manda("jogando");
+  }, 30000);
+
+  // Sair da página acorda os DOIS eventos (pagehide e visibilitychange), com
+  // milissegundos de diferença — sem essa trava vai linha repetida pra tabela.
+  var jaMandouSaiu = false;
+  function mandaSaiu() {
+    if (jaMandouSaiu) return;
+    jaMandouSaiu = true;
+    salvaTempo();
+    salvaJogo();
+    manda("saiu");
+  }
+  window.addEventListener("pagehide", mandaSaiu);
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) mandaSaiu();
+    else jaMandouSaiu = false;   // voltou pra aba: o próximo sair conta de novo
+  });
+  var ESTOPIM = 16 * 60 * 100;   // 16 min: o Tony chama o Théo de frouxo
+
+  var st = {
+    cs: TOTAL, volta: 1, lugar: "quarto1",
+    sabe: {}, conhece: {}, vistos: {}, mortos: {},
+    acabou: false, estourou: false, dormiu: 0, acoes: 0, morrendo: false,
+    trancou: false, perguntou: false, aberto: null, hudAtivo: false, pausado: true
+  };
+
+  // ================= CONTEÚDO =================
+
+  var ABERTURA = [
+    { t: "🔁 VOLTA 1 — acorda no quarto. Menu inicial: [relógio] + Você. O resto abre com 'olhar em volta'.", c: "forte" }
+  ];
+
+  var COISAS = {
+    relogio: { nome: "Relógio no seu pulso", onde: "*", inicial: true, acoes: [
+      { id: "olhar", label: "olhar de perto", custo: 2, sabe: "relogio", txt: [
+        "Prateado, pesado, caro demais pra ser seu. A pulseira está no furo mais apertado e ainda sobra.",
+        "Atrás, gravado fundo: T.M."
+      ]},
+      { id: "ouvir", label: "encostar no ouvido", custo: 1, sabe: "sem_tique", txt: [
+        "Nada. Nenhum tique, nenhum motorzinho, nenhum zumbido.",
+        "E os números continuam caindo."
+      ]},
+      { id: "tirar", label: "tentar tirar do pulso", custo: 1, sabe: "nao_sai", txt: [
+        "Você acha o fecho e puxa. Ele não abre.",
+        "Não está emperrado, não está apertado demais. Simplesmente não abre."
+      ]}
+    ]},
+
+    // ---- quarto 1
+    cama: { nome: "Cama", onde: "quarto1", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, txt: [
+        "Desfeita de um lado só. Você dormiu por cima do cobertor, de roupa e de tênis.",
+        "Ninguém dorme assim. Alguém te botou aqui."
+      ]},
+      { id: "embaixo", label: "olhar embaixo", custo: 2, sabe: "moeda", pega: "moeda_cama", someAposPegar: true, txt: [
+        "Poeira, um chinelo sem par, e uma coisa redonda encostada no rodapé.",
+        "Uma moeda grossa e pesada, cor de ouro velho. Sem número, sem rosto, só um símbolo que você não reconhece."
+      ]}
+    ]},
+    armario: { nome: "Guarda-roupa", onde: "quarto1", acoes: [
+      { id: "abrir", label: "abrir", custo: 2, revela: ["camisinha"], txt: [
+        "Roupa de outra pessoa, tudo do tamanho errado, tudo dobrado como quem nunca usou.",
+        "E no fundo, jogada num canto, uma [camisinha] usada."
+      ]}
+    ]},
+    camisinha: { nome: "Camisinha", onde: "quarto1", acoes: [
+      { id: "olhar", label: "examinar", custo: 2, sabe: "camisinha", txt: [
+        "Usada, e não faz muito tempo.",
+        "Não foi você. Pelo menos não na parte da noite que existe na sua cabeça."
+      ]}
+    ]},
+    celular: { nome: "Celular na mesinha", onde: "quarto1", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "celular_visto", txt: [
+        "Não é o seu. A tela acende sozinha: quarenta e sete por cento, e uma conversa aberta.",
+        "Aberta mesmo. Ninguém devia ter deixado isso aberto."
+      ]},
+      { id: "ler", label: "ler a conversa", custo: 2, exige: "celular_visto", sabe: "lucas_tony", eco: true,
+        revelaNome: ["lucas", "tony", "marcely"], txt: [
+        "{LUCAS}: apaga isso",
+        "{TONY}: relaxa ninguem vai ver",
+        "{LUCAS}: se a {marcely} descobrir eu morro",
+        "{TONY}: entao nao conta"
+      ]}
+    ]},
+    portaQuarto: { nome: "Porta", onde: "quarto1", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "porta_quarto", txt: [
+        "Você encosta a mão. Ela cede.",
+        "Não está trancada. Nunca esteve — você é que ainda não tinha tentado."
+      ]},
+      { id: "ouvir", label: "encostar o ouvido", custo: 2, sabe: "vozes", txt: [
+        "Duas vozes, do outro lado. Uma mulher perguntando por alguém. Um homem enrolando pra responder.",
+        "Ela pergunta de novo. Ele muda de assunto de novo.",
+        "Nenhum dos dois fala de você."
+      ]},
+      { id: "abrir", label: "abrir", custo: 1, exige: "porta_quarto", sabe: "porta_aberta", txt: [
+        "Você abre devagar, o mínimo que dá.",
+        "Do outro lado tem claridade e voz. É um cômodo grande.",
+        "Ninguém olha pra cá."
+      ]},
+      { id: "espiar", label: "olhar o que tem lá", custo: 1, exige: "porta_aberta", espia: true }
+    ]},
+    copo: { nome: "Copo no chão", onde: "quarto1", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "tomei", txt: [
+        "Um dedo de bebida parada no fundo.",
+        "Na borda, grudado, um pó branco que não é açúcar. Você bebeu disso."
+      ]}
+    ]},
+
+    // ---- sala
+    sofa: { nome: "Sofá", onde: "sala", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, txt: [
+        "Fundo, velho, com uma manta jogada por cima.",
+        "Pesado o suficiente pra travar uma porta, se alguém empurrasse com vontade."
+      ], sabe: "sofa_trava" },
+      { id: "vasculhar", label: "vasculhar entre as almofadas", custo: 2, txt: [
+        "Moeda de um real, um isqueiro, uma meia.",
+        "E um brinco que não é de ninguém que você viu até agora."
+      ]},
+      // a promessa do examinar agora tem anzol: o sofá é a segunda tranca da casa
+      { id: "arrastar", label: "arrastar até a porta do quarto 2", custo: 3,
+        exige: "sofa_trava", exigeConhece: "portaQ2", trava: true, txt: [
+        "Você tira a manta, firma o pé e empurra. O sofá atravessa a sala gemendo e entala na boca do corredor. Você empurra mais.",
+        "Ele encosta na porta do quarto 2 e para, como se tivesse nascido ali. Ninguém abre isso por dentro.",
+        "O quack continua, abafado, no mesmo ritmo de sempre. Ele nem percebeu."
+      ]}
+    ]},
+    portaRua: { nome: "Porta da rua", onde: "sala", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "travada", txt: [
+        "Sem chave na fechadura, sem tranca, sem nada emperrando.",
+        "Você puxa. Ela não abre. Não é força que falta — é como se do outro lado não tivesse lado nenhum."
+      ]},
+      { id: "bater", label: "esmurrar e gritar", custo: 2, txt: [
+        "Você bate até a mão doer. O barulho morre na madeira, sem eco.",
+        "Lá dentro, alguém pergunta se você está bem. Ninguém levanta."
+      ]}
+    ]},
+    janelaSala: { nome: "Janela da sala", onde: "sala", acoes: [
+      { id: "olhar", label: "olhar pra fora", custo: 1, sabe: "temporal", txt: [
+        "Água descendo no vidro, tanta que o quintal virou um borrão.",
+        "Um relâmpago acende tudo por meio segundo. E no meio segundo seguinte está tudo igual — a mesma árvore torta, a mesma poça, o mesmo relâmpago."
+      ]}
+    ]},
+    som: { nome: "Caixa de som", onde: "sala", acoes: [
+      { id: "ligar", label: "ligar", custo: 1, sabe: "som_liga", txt: [
+        "Ainda tem bateria. Entra uma música alta demais pro tamanho da sala.",
+        "Da cozinha, alguém grita pra você abaixar isso."
+      ]}
+    ]},
+
+    // ---- quarto 2
+    portaQ2: { nome: "Porta do quarto 2", onde: "corredorQ2", acoes: [
+      { id: "ouvir", label: "encostar o ouvido", custo: 1, sabe: "quack", txt: [
+        "Um som curto, repetido, com pausas irregulares.",
+        "Quack.",
+        "Quack. Quack.",
+        "É uma pessoa fazendo isso com a boca."
+      ]},
+      { id: "abrir", label: "abrir a porta", custo: 1, vaiPara: "quarto2" },
+      { id: "trancar", label: "travar a porta", custo: 2, trava: true, txt: [
+        "Você encaixa o encosto da cadeira embaixo da maçaneta e testa. Segura.",
+        "Do lado de dentro, o quack continua. Ele nem percebeu."
+      ]}
+    ]},
+    armarioQ2: { nome: "Armário do quarto 2", onde: "quarto2", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, revela: ["arma"], txt: [
+        "Vazio, tirando cabide.",
+        "Mas embaixo dele, no vão do rodapé, tem alguma coisa escura que não é sombra. Uma [arma]."
+      ]}
+    ]},
+    arma: { nome: "Arma", onde: "quarto2", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "arma", txt: [
+        "Revólver velho, cabo lascado, carregado.",
+        "Está limpo demais pra estar largado num vão de armário há muito tempo."
+      ]},
+      { id: "pegar", label: "pegar a arma", custo: 1, sabe: "pegou_arma", pega: "arma", someAposPegar: true, txt: [
+        "Você pega. É mais pesada do que parece nos filmes.",
+        "Enquanto ela estiver com você, não está com quem ia usá-la."
+      ]}
+    ]},
+    caderno: { nome: "Caderno", onde: "quarto2", acoes: [
+      { id: "ler", label: "folhear", custo: 2, sabe: "caderno", txt: [
+        "Contas. Páginas e páginas de contas que você não entende, com uma letra que vai piorando.",
+        "Nas últimas folhas, a matemática some e sobra uma palavra circulada várias vezes, cada vez mais fundo:",
+        "PATO."
+      ]}
+    ]},
+
+    // ---- cozinha
+    geladeira: { nome: "Geladeira", onde: "cozinha", acoes: [
+      { id: "abrir", label: "abrir", custo: 2, revela: ["maquina"], txt: [
+        "Meia melancia, cerveja, um pote sem tampa.",
+        "E, na prateleira do meio, entre a comida, uma [máquina] do tamanho de um livro. Metal escovado, três encaixes redondos e vazios."
+      ]}
+    ]},
+    maquina: { nome: "Máquina", onde: "cozinha", acoes: [
+      { id: "olhar", label: "examinar", custo: 2, sabe: "maquina", txt: [
+        "Três encaixes redondos, do tamanho exato da moeda que você achou.",
+        "Nenhum botão. Nenhum fio. Está morna."
+      ]},
+      { id: "encaixar", label: "encaixar as moedas que tiver", custo: 1, exige: "maquina", encaixa: true }
+    ]},
+    facas: { nome: "Facas", onde: "cozinha", acoes: [
+      { id: "pegar", label: "pegar uma", custo: 1, pega: "faca", sabe: "faca", someAposPegar: true, txt: [
+        "Você escolhe a maior e enfia no bolso de trás.",
+        "Não sabe ainda pra quê. Só sabe que é melhor você com ela do que ela na gaveta."
+      ]}
+    ]},
+    roupas: { nome: "Roupas jogadas", onde: "cozinha", acoes: [
+      { id: "revirar", label: "revirar", custo: 2, revela: ["lista"], txt: [
+        "Calcinha, camiseta, uma bermuda molhada. Roupa de festa que virou roupa de chão.",
+        "No bolso da bermuda, um papel dobrado. Uma [lista]."
+      ]}
+    ]},
+    lista: { nome: "Papel dobrado", onde: "cozinha", acoes: [
+      // pega: mostrar a lista pra alguém exige o papel na mão — não a memória dele
+      { id: "ler", label: "ler", custo: 1, sabe: "lista", pega: "lista", eco: true,
+        revelaNome: ["lucas", "tony", "marcely", "theo"], txt: [
+        "isqueiro do {lucas} — sexta",
+        "brinco (não sei de quem) — sexta",
+        "óculos do {tony} — sábado",
+        "batom da {marcely} — sábado",
+        "relógio do {théo} — TROQUEI"
+      ]}
+    ]},
+    bolo: { nome: "Bolo", onde: "cozinha", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, txt: [
+        "Metade comido, direto da forma, com garfo espetado no meio.",
+        "Alguém está comendo isso há mais tempo do que faz sentido."
+      ]}
+    ]},
+
+    // ---- banheiro
+    armarinho: { nome: "Armarinho", onde: "banheiro", acoes: [
+      { id: "abrir", label: "abrir", custo: 1, revela: ["comprimidos"], txt: [
+        "Pasta de dente, cotonete, um perfume que ninguém usou.",
+        "E uma cartela de [comprimidos] pela metade."
+      ]}
+    ]},
+    comprimidos: { nome: "Comprimidos", onde: "banheiro", acoes: [
+      { id: "olhar", label: "examinar", custo: 1, sabe: "comprimidos", pega: "comprimidos", txt: [
+        "A receita está grampeada na caixa, no nome de uma pessoa que não está nessa casa.",
+        "É o que tinha no fundo do seu copo. Você põe a cartela no bolso."
+      ]}
+    ]},
+    carta: { nome: "Carta dobrada", onde: "banheiro", acoes: [
+      { id: "ler", label: "ler", custo: 2, sabe: "carta", pega: "carta", eco: true,
+        revelaNome: ["marcely"], txt: [
+        "{Marcely},",
+        "eu construí uma coisa que não devia existir e ela funciona. Se eu te contar direito você vai achar que eu pirei, então vou te mostrar.",
+        "Se der errado, quero que você saiba que eu te amo desde o primeiro dia e que isso é a única parte de mim que não tem conta pra explicar.",
+        "T."
+      ]}
+    ]},
+    espelho: { nome: "Espelho", onde: "banheiro", acoes: [
+      { id: "olhar", label: "se olhar", custo: 1, sabe: "rosto", txt: [
+        "Um homem cansado, olho fundo, marca de travesseiro na cara.",
+        "Leva um segundo até você entender que é você."
+      ]}
+    ]}
+  };
+
+  // ================= LUGARES =================
+
+  var LUGARES = {
+    quarto1: {
+      nome: "Quarto",
+      chegada: [
+        "Quarto de casa alugada, sem janela nenhuma. Tudo arrumado, nada com nome, nada com foto.",
+        "Uma [cama] desfeita de um lado só. Um [guarda-roupa] encostado na parede. Em cima da mesinha, um [celular] que não é o seu. No chão, perto do rodapé, um [copo] caído.",
+        "Cheiro de desinfetante por baixo do cheiro de festa. Alguém limpou aqui faz pouco tempo.",
+        "E uma [porta]. É a única saída deste quarto."
+      ],
+      curta: ["Seu quarto. A cama desfeita de um lado só."],
+      revela: ["cama", "armario", "celular", "copo", "portaQuarto"],
+      // examinar a porta já libera sair; abrir/espiar viram reconhecimento opcional.
+      // "sair do quarto" e não "ir pra sala": quem só tocou a porta não sabe o que tem lá
+      saidas: [{ id: "sala", label: "sair do quarto", custo: 1, exige: "porta_quarto" }]
+    },
+    sala: {
+      nome: "Sala",
+      chegada: [
+        "Sala grande, luz amarela, cheiro de festa que acabou faz pouco.",
+        "Copo em cima de tudo. Uma [caixa de som] no chão, uma [janela] tomada de chuva, um [sofá] fundo e a [porta da rua].",
+        "Três saídas: um [corredor] escuro comendo o fundo da casa, uma porta de onde vem luz branca e barulho de louça — a [cozinha] — e outra entreaberta, pingando: o [banheiro]."
+      ],
+      curta: ["A sala. Copo em cima de tudo."],
+      revela: ["sofa", "portaRua", "janelaSala", "som"],
+      saidas: [
+        { id: "quarto1", label: "voltar pro seu quarto", custo: 1 },
+        { id: "corredorQ2", label: "ir até o corredor", custo: 1 },
+        { id: "cozinha", label: "ir pra cozinha", custo: 1 },
+        { id: "banheiro", label: "ir pro banheiro", custo: 1 }
+      ]
+    },
+    corredorQ2: {
+      nome: "Corredor",
+      chegada: [
+        "Corredor curto e escuro. No fim dele, a [porta do quarto 2], fechada.",
+        "Vem barulho de lá de dentro."
+      ],
+      curta: ["O corredor. A porta do quarto 2 no fim."],
+      revela: ["portaQ2"],
+      saidas: [{ id: "sala", label: "voltar pra sala", custo: 1 }]
+    },
+    quarto2: {
+      nome: "Quarto 2",
+      chegada: [
+        "Quarto menor que o seu, abafado, com cheiro de suor.",
+        "Um [armário] de porta aberta e um [caderno] largado na cama."
+      ],
+      // o nome só entra quando o jogador aprende
+      curta: function () {
+        return [(st.sabe["nome_theo"] ? "O quarto do Théo." : "O quarto 2.") + " Abafado."];
+      },
+      revela: ["armarioQ2", "caderno"],
+      saidas: [{ id: "corredorQ2", label: "sair do quarto", custo: 1 }]
+    },
+    cozinha: {
+      nome: "Cozinha",
+      chegada: [
+        "Pia cheia, chão pegajoso, luz branca dura.",
+        "Uma [geladeira], um bloco de [facas], [roupas] jogadas num canto e um [bolo] pela metade em cima da mesa."
+      ],
+      curta: ["A cozinha. Luz branca dura."],
+      revela: ["geladeira", "facas", "roupas", "bolo"],
+      saidas: [{ id: "sala", label: "voltar pra sala", custo: 1 }]
+    },
+    banheiro: {
+      nome: "Banheiro",
+      chegada: [
+        "Box molhado, toalha no chão, vapor ainda no [espelho].",
+        "Um [armarinho] entreaberto e, em cima da pia, uma [carta] dobrada em quatro."
+      ],
+      curta: ["O banheiro. Vapor no espelho."],
+      revela: ["espelho", "armarinho", "carta"],
+      saidas: [{ id: "sala", label: "voltar pra sala", custo: 1 }]
+    }
+  };
+
+  // ================= PESSOAS =================
+  // agenda em minutos restantes: [de, até, lugar]
+
+  // apelidos SEM artigo: o motor põe "um/uma" enquanto a pessoa é estranha e
+  // "o/a" depois que o jogador já a viu — artigo definido pressupõe conhecer.
+  // Minúscula porque entram no meio de frase; cap() sobe no botão/início.
+  // olharEm: o observar muda com o cômodo — texto fixo mentia quando a pessoa andava.
+  var PESSOAS = {
+    theo: {
+      nome: "Théo", apelido: "cara de cueca",
+      // até 0: o pato não sai sozinho — quem o tira do quarto é o estopim (theoLugar)
+      agenda: [[30, 0, "quarto2"]],
+      olhar: [
+        "Sentado no chão, de cueca, encostado na parede.",
+        "Ele te olha, abre os braços devagar e faz um som curto com a boca. Quack.",
+        "Está feliz de te ver. Sinceramente feliz."
+      ],
+      falar: [
+        "— Ei. Você tá me ouvindo?",
+        "— Quack.",
+        "Ele responde tudo assim. Mas responde na hora certa, com a entonação certa. É conversa. Só não é em português."
+      ]
+    },
+    jennifer: {
+      nome: "Jennifer", apelido: "moça que mexe em tudo", fem: true,
+      agenda: [[30, 24, "cozinha"], [24, 16, "sala"]],
+      olhar: [
+        "Comendo bolo direto da forma, sem prato, olhando pro nada.",
+        "Enquanto conversa, a mão dela mexe nas coisas em cima da mesa. Pega, roda, larga. Pega de novo."
+      ],
+      olharEm: {
+        sala: [
+          "Sentada no braço do sofá, comendo o resto de um bolo que trouxe da cozinha, direto da forma.",
+          "A mão livre dela passeia pelas coisas da sala. Pega, roda, larga. O isqueiro que ela largou não é o que ela pegou."
+        ]
+      },
+      falar: [
+        "— Bom dia — ela diz, de boca cheia. — Você tava apagado feio.",
+        "Ela não pergunta como você está. Ela já sabe que você não lembra."
+      ]
+    },
+    lucas: {
+      nome: "Lucas", apelido: "cara de cabelo molhado",
+      agenda: [[30, 18, "banheiro"], [18, 16, "cozinha"]],
+      olhar: [
+        "Cabelo molhado, camisa amassada na mão. Fecha a porta do banheiro atrás de si rápido demais.",
+        "Não te olha na cara."
+      ],
+      olharEm: {
+        banheiro: [
+          "Cabelo molhado, sem camisa, a camisa amassada na mão fingindo que ia ser vestida agora.",
+          "Ele fica entre você e o box, como quem protege a vista de alguma coisa. Não te olha na cara."
+        ],
+        cozinha: [
+          "Cabelo ainda úmido, camisa agora vestida, abotoada errada por um botão.",
+          "Ele come em pé, de costas pra porta, rápido demais pra quem não tem pressa nenhuma."
+        ]
+      },
+      falar: [
+        "— Fala. Dormiu bem?",
+        "Ele pergunta olhando pro chão, e já vai saindo antes de você responder."
+      ]
+    },
+    tony: {
+      nome: "Tony", apelido: "cara sem camisa",
+      agenda: [[30, 18, "banheiro"], [18, 16, "quarto2"]],
+      olhar: [
+        "Sem camisa, ombro apoiado no batente, sorrindo de um jeito que não chega no olho.",
+        "Tem alguma coisa pesando no bolso da bermuda dele."
+      ],
+      olharEm: {
+        quarto2: [
+          "Sem camisa, sentado na beirada da cama, girando alguma coisa pequena entre os dedos.",
+          "Ele te olha entrar e não para de girar. — Perdeu alguma coisa aqui?"
+        ]
+      },
+      falar: [
+        "— O morto acordou.",
+        "Ele ri sozinho da própria piada e continua rindo tempo demais."
+      ]
+    },
+    marcely: {
+      nome: "Marcely", apelido: "moça inquieta", fem: true,
+      agenda: [[30, 18, "sala"], [18, 16, "banheiro"]],
+      olhar: [
+        "Sentada na ponta do sofá, joelho batendo, olhando pro corredor toda vez que alguém passa.",
+        "Está esperando alguém que não é você."
+      ],
+      olharEm: {
+        banheiro: [
+          "Parada na frente da pia, torneira aberta, sem usar a água.",
+          "Ela te vê pelo espelho antes de você dizer qualquer coisa. — Ele ainda não voltou."
+        ]
+      },
+      falar: [
+        "— Você viu o {Lucas}?",
+        "É a primeira coisa que ela fala. Provavelmente é a primeira coisa que ela fala com todo mundo hoje."
+      ],
+      revelaNome: ["lucas"]
+    }
+  };
+
+  // assunto -> o que cada um responde (fallback se não tiver)
+  // nomes: quem FALA um nome na resposta é quem revela — por pessoa, não por assunto
+  var ASSUNTOS = [
+    { id: "relogio", label: "perguntar do relógio", exige: "relogio", custo: 1,
+      nomes: { lucas: ["theo"], marcely: ["theo"] }, resp: {
+      jennifer: ["Ela olha pro seu pulso e volta pro bolo rápido demais.",
+                 "— Sei lá, tava aí. Você tava usando ontem também."],
+      lucas: ["— O {Théo} vivia olhando pra esse negócio. Tipo, o tempo todo.",
+              "— Perguntei uma vez o que era. Ele riu."],
+      marcely: ["— Isso é do {Théo} — ela diz, e para. — Por que você tá com o relógio do Théo?"],
+      tony: ["— Bonito. Caro. Não é seu.", "Ele acha graça."],
+      theo: ["Ele olha o próprio pulso, depois o seu, depois o próprio de novo.",
+             "Não reconhece nenhum dos dois."]
+    }},
+    { id: "lista", label: "mostrar a lista", exige: "lista", exigeTem: "lista", custo: 1,
+      nomes: { lucas: ["jennifer"] }, resp: {
+      jennifer: ["A cor dela sai do rosto de uma vez.",
+                 "— Eu devolvo tudo. Eu sempre devolvo. É que eu... é que eu pego, sabe?",
+                 "Ela puxa uma moeda de ouro do bolso e põe na sua mão sem você pedir.",
+                 "— Essa aqui não era minha. Nunca foi."],
+      lucas: ["— Ah, isso é a {Jennifer}. Ela pega as coisas. Todo mundo sabe, ninguém fala."]
+    }, dá: "moeda_jennifer" },
+    { id: "quack", label: "perguntar do barulho", exige: "quack", custo: 1,
+      nomes: { lucas: ["theo"], marcely: ["tony"] }, resp: {
+      lucas: ["— É o {Théo}. Ele tomou alguma parada ontem e não voltou direito.",
+              "— Ficou falando de voltar no tempo, aí falou que queria ser um pato. Aí só sobrou o pato."],
+      tony: ["O sorriso some. — Deixa o cara quieto.", "É a primeira vez que ele te olha na cara."],
+      marcely: ["— Ele tá assim desde de madrugada. Eu queria entrar, mas o {Tony} disse pra deixar."],
+      jennifer: ["— Melhor não mexer."]
+    }},
+    { id: "comprimidos", label: "mostrar os comprimidos", exige: "comprimidos", custo: 1,
+      nomes: { lucas: ["tony"], marcely: ["theo"] }, resp: {
+      lucas: ["Ele pega a cartela, lê o nome na receita e fica muito quieto.",
+              "— Isso é do {Tony}.",
+              "Ele sai andando pro corredor antes de você perguntar mais nada."],
+      tony: ["— Não é meu.", "Ele diz rápido demais pra ser verdade."],
+      marcely: ["— O {Théo} tomou isso? — ela levanta. — Ele tomou isso por quê?"]
+    }, gatilho: "lucas_sabe" },
+    { id: "segredo", label: "falar do Lucas e do Tony", exige: "lucas_tony", custo: 1, resp: {
+      marcely: ["Ela ouve até o fim sem piscar.",
+                "Depois senta. Não chora, não grita, não pergunta nada.",
+                "— Tá. — E fica olhando a parede."],
+      lucas: ["— Você mexeu no meu celular.", "Ele fala baixo, e é pior do que se gritasse."],
+      tony: ["Ele se aproxima um passo e o sorriso continua no lugar.", "— Repete isso na frente dela e a gente vê o que acontece."]
+    }, gatilho: "expos" },
+    { id: "carta", label: "entregar a carta", exige: "carta", custo: 1, resp: {
+      marcely: ["Ela lê duas vezes.",
+                "— Onde ele tá.",
+                "Não é pergunta. Ela já está de pé."],
+      lucas: ["— Isso não é meu. Devolve onde tava."]
+    }, gatilho: "marcely_sabe" },
+    { id: "maquina", label: "perguntar da máquina", exige: "maquina", custo: 1, resp: {
+      lucas: ["— Ele trouxe uma parada do trabalho. Falou que era um experimento.",
+              "— Falou que dava pra voltar. Voltar pra onde, cara?"],
+      marcely: ["— Ele me disse que ia me mostrar hoje. Mostrar o quê?"],
+      theo: ["Ele fica sério pela primeira vez.",
+             "Aponta pro seu pulso. Depois pro chão. Depois faz um círculo no ar com o dedo, devagar, três vezes.",
+             "Quack."]
+    }},
+    { id: "loop", label: "dizer que isso já aconteceu", exige: "loop", custo: 1, resp: {
+      jennifer: ["— Você ainda tá chapado, meu amigo."],
+      lucas: ["Ele ri. Depois para de rir. — Para com isso."],
+      tony: ["— Tá vendo? É por isso que ninguém te chama."],
+      marcely: ["— Você tá me assustando."],
+      theo: ["Ele para tudo.",
+             "Levanta, chega perto, segura seu pulso com as duas mãos e olha o relógio por um tempo longo demais.",
+             "Aí ele olha pra você e faz que sim com a cabeça. Devagar. Várias vezes.",
+             "Ele acredita em você. É o único."]
+    }}
+  ];
+
+  var VOCE = { id: "voce", nome: "Você...", acoes: [
+    { id: "volta", label: "olhar em volta", custo: 1, olharVolta: true },
+    { id: "escutar", label: "escutar a casa", custo: 1, sabe: "escutou", txt: [
+      "Chuva. Uma torneira pingando em algum lugar.",
+      "E um barulho curto, repetido, vindo do outro lado da casa. Você não consegue nomear aquilo."
+    ]},
+    { id: "maos", label: "olhar suas mãos", custo: 1, txt: [
+      "As duas tremem sozinhas. Não é frio.",
+      "É alguma coisa saindo do seu corpo, e você não sabe o quê."
+    ]},
+    { id: "bolsos", label: "procurar nos bolsos", custo: 1, sabe: "moeda", pega: "moeda_bolso", someAposPegar: true, txt: [
+      "Chave nenhuma. Carteira nenhuma.",
+      "Uma moeda grossa e pesada, cor de ouro velho. Ninguém põe uma coisa dessas no bolso sem lembrar."
+    ]},
+    { id: "lembrar", label: "lembrar de ontem", custo: 2, sabe: "loop",
+      txtPrimeira: [
+        "Você fecha os olhos e tenta puxar alguma coisa de ontem.",
+        "Não vem nada. E não é esquecimento de bêbado — é um buraco. Como se alguém tivesse arrancado a página."
+      ],
+      txt: [
+        "Dessa vez vem.",
+        "Vocês chegaram ontem. Eram seis. Teve festa, teve gente rindo alto, teve alguém chorando no corredor.",
+        "Depois disso é um corte seco, como fita cortada com tesoura."
+      ]},
+    { id: "gritar", label: "gritar por socorro", custo: 1, sabe: "gritei", txt: [
+      "Você grita.",
+      "As vozes param. Param completamente.",
+      "Ninguém vem. Depois de um tempo elas voltam, mais baixas."
+    ]},
+    { id: "dormir", label: "tentar dormir", custo: 2, dorme: true }
+  ]};
+
+  // só o que é achado de verdade conta no placar — não os "viu_", "nome_", "falou_"
+  var DESCOBERTAS = [
+    "relogio", "sem_tique", "nao_sai", "moeda", "camisinha", "lucas_tony",
+    "tomei", "vozes", "quack", "loop", "gritei", "sem_sono", "rosto",
+    "caderno", "arma", "maquina", "lista", "carta", "comprimidos",
+    "travada", "temporal", "sofa_trava", "som_liga", "porta_quarto", "viu_sala"
+  ];
+  var TOTAL_DESCOBERTAS = DESCOBERTAS.length;
+
+  // ================= ELEMENTOS =================
+
+  var elTexto = document.getElementById("texto");
+  var elOpcoes = document.getElementById("opcoes");
+  var elClock = document.getElementById("clock");
+  var elOnde = document.getElementById("onde");
+  var elFlash = document.getElementById("flash");
+
+  function minutos() { return st.cs / 6000; }
+
+  function relogio() {
+    var cs = Math.max(0, Math.floor(st.cs));
+    var s = Math.floor(cs / 100);
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" +
+           String(s % 60).padStart(2, "0") + ":" +
+           String(cs % 100).padStart(2, "0");
+  }
+
+  function pintaRelogio() {
+    elClock.textContent = relogio();
+    var big = document.getElementById("clockBig");
+    if (big) big.textContent = relogio();
+    elClock.classList.toggle("baixo", st.cs <= 30000);
+    elOnde.innerHTML = "<b>" + LUGARES[st.lugar].nome + "</b><br>volta " + st.volta;
+    document.title = relogio();
+  }
+
+  function semAnim() {
+    return true;   // MODO FLUXO: nenhuma animação, nunca
+  }
+
+  function plano(t) { return t.replace(/[\[\]\{\}]/g, ""); }
+  function marcado(t) {
+    return t.replace(/\[([^\]]+)\]/g, '<span class="obj">$1</span>')
+            .replace(/\{([^\}]+)\}/g, '<span class="quem">$1</span>');
+  }
+
+  // ================= DIGITAÇÃO =================
+
+  var digitacao = null, perg = null, aguardando = null, saindoTimer = null;
+
+  function completaTexto() {
+    if (!digitacao) return;
+    clearInterval(digitacao.timer);
+    digitacao.ps.forEach(function (p) {
+      p.innerHTML = marcado(p.getAttribute("data-full"));
+    });
+    var cb = digitacao.fim;
+    digitacao = null;
+    if (cb) cb();
+  }
+
+  function pintaLinhas(linhas, classe) {
+    elTexto.innerHTML = "";
+    linhas.forEach(function (l) {
+      var p = document.createElement("p");
+      var txt;
+      if (typeof l === "string") { txt = l; if (classe) p.className = classe; }
+      else { txt = l.t; if (l.c) p.className = l.c; }
+      p.innerHTML = marcado(txt);
+      elTexto.appendChild(p);
+    });
+  }
+
+  function escreve(linhas, classe, aoTerminar, instantaneo) {
+    if (digitacao) { clearInterval(digitacao.timer); digitacao = null; }
+    st.ultimas = { linhas: linhas, classe: classe };
+    elTexto.innerHTML = "";
+    elOpcoes.innerHTML = "";
+    aguardando = null;
+
+    var ps = linhas.map(function (l) {
+      var p = document.createElement("p");
+      var txt;
+      if (typeof l === "string") { txt = l; if (classe) p.className = classe; }
+      else { txt = l.t; if (l.c) p.className = l.c; }
+      p.setAttribute("data-full", txt);
+      elTexto.appendChild(p);
+      return p;
+    });
+    window.scrollTo(0, 0);
+
+    if (semAnim() || instantaneo) {
+      ps.forEach(function (p) { p.innerHTML = marcado(p.getAttribute("data-full")); });
+      if (aoTerminar) aoTerminar();
+      return;
+    }
+
+    var i = 0, j = 0;
+    var cursor = document.createElement("span");
+    cursor.className = "cursor";
+
+    digitacao = { ps: ps, fim: aoTerminar, timer: 0 };
+    digitacao.timer = setInterval(function () {
+      if (i >= ps.length) { completaTexto(); return; }
+      var cru = plano(ps[i].getAttribute("data-full"));
+      if (j < cru.length) {
+        j += 1;
+        ps[i].textContent = cru.slice(0, j);
+        ps[i].appendChild(cursor);
+      } else {
+        if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+        ps[i].innerHTML = marcado(ps[i].getAttribute("data-full"));
+        i += 1; j = 0;
+      }
+    }, 38);
+  }
+
+  function completaPergunta() {
+    if (!perg) return;
+    clearTimeout(perg.pausa);
+    clearInterval(perg.timer);
+    perg.el.textContent = perg.txt;
+    var cb = perg.fim;
+    perg = null;
+    poeClockBig();
+    if (cb) cb();
+  }
+
+  // ================= RELÓGIO =================
+
+  var ultimoT = Date.now();
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) ultimoT = Date.now();
+  });
+
+  // enquanto tem texto na tela esperando o jogador, nenhum evento pode atropelar
+  function ocupado() {
+    return !!(digitacao || perg || aguardando || saindoTimer || st.morrendo);
+  }
+
+  setInterval(function () {
+    var agora = Date.now();
+    var dt = agora - ultimoT;
+    ultimoT = agora;
+    if (st.acabou || st.pausado) return;
+    // zerado: espera o jogador terminar de ler — o tick tenta de novo em 50ms
+    if (st.cs <= 0) {
+      if (!ocupado()) morre("tempo");
+      return;
+    }
+
+    st.cs -= (dt / 10) * (st.hudAtivo ? LENTO : 1);
+    if (st.cs <= 0) { st.cs = 0; pintaRelogio(); return; }
+    pintaRelogio();
+
+    // o estopim acontece na hora dele, mesmo se o jogador nunca tiver agido
+    if (!ocupado()) tentaEstopim();
+  }, 50);
+
+  var ultimaLinha = null;
+
+  function poeClockBig() {
+    if (st.hudAtivo || !ultimaLinha) return;
+    if (ultimaLinha.querySelector("#clockBig")) return;
+    var c = document.createElement("div");
+    c.id = "clockBig";
+    c.textContent = relogio();
+    ultimaLinha.appendChild(c);
+
+    if (!semAnim()) {
+      c.style.opacity = "0";
+      c.style.transform = "translateY(10px)";
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          c.style.transition =
+            "opacity 900ms ease, transform 900ms cubic-bezier(.4,0,.2,1)";
+          c.style.opacity = "1";
+          c.style.transform = "translateY(0)";
+        });
+      });
+      setTimeout(function () { c.style.opacity = "1"; c.style.transform = "none"; }, 1000);
+    }
+
+    st.pausado = false;   // MODO FLUXO: sem cerimônia de abertura
+  }
+
+  function linhaPergunta(classe) {
+    var linha = document.createElement("div");
+    linha.className = "linhaPergunta";
+    var d = document.createElement("div");
+    d.className = classe;
+    linha.appendChild(d);
+    elOpcoes.appendChild(linha);
+    ultimaLinha = linha;
+    return d;
+  }
+
+  function voaProCanto() {
+    var big = document.getElementById("clockBig");
+    if (!big || semAnim()) { elClock.classList.remove("escondido"); return; }
+    var r1 = big.getBoundingClientRect();
+    var r2 = elClock.getBoundingClientRect();
+    var clone = document.createElement("div");
+    clone.className = "clockVoando";
+    clone.textContent = big.textContent;
+    clone.style.left = r1.left + "px";
+    clone.style.top = r1.top + "px";
+    document.body.appendChild(clone);
+    big.style.visibility = "hidden";
+    void clone.offsetWidth;
+    clone.style.transition = "transform 650ms cubic-bezier(.5,.05,.25,1)";
+    clone.style.transform =
+      "translate(" + (r2.left - r1.left) + "px," + (r2.top - r1.top) + "px)";
+    setTimeout(function () {
+      if (clone.parentNode) clone.remove();
+      elClock.classList.remove("escondido");
+    }, 680);
+  }
+
+  function perguntaAnimada(txt, aoTerminar) {
+    if (perg) { clearTimeout(perg.pausa); clearInterval(perg.timer); perg = null; }
+    var d = linhaPergunta("pergunta" + (st.cs <= 30000 ? " urgente" : ""));
+
+    if (semAnim()) { d.textContent = txt; poeClockBig(); if (aoTerminar) aoTerminar(); return; }
+
+    var lenta = !st.perguntou;
+    st.perguntou = true;
+    var palavras = txt.split(" ");
+    var ritmo = lenta ? 420 : 200, espera = lenta ? 900 : 250, i = 0;
+
+    perg = { el: d, txt: txt, fim: aoTerminar, timer: 0, pausa: 0 };
+    perg.pausa = setTimeout(function () {
+      if (!perg) return;
+      perg.timer = setInterval(function () {
+        if (i >= palavras.length) { completaPergunta(); return; }
+        d.textContent = i === 0 ? palavras[0] : d.textContent + " " + palavras[i];
+        i += 1;
+      }, ritmo);
+    }, espera);
+  }
+
+  function esperaClique(fn) {
+    aguardando = fn;
+    var alvo = elOpcoes.querySelector(".pergunta");
+    if (alvo) {
+      var c = document.createElement("span");
+      c.className = "cursor";
+      alvo.appendChild(c);
+    }
+  }
+
+  function esperaNoTexto(depois) {
+    var ps = elTexto.querySelectorAll("p");
+    var ultimo = ps[ps.length - 1];
+    if (ultimo) {
+      var c = document.createElement("span");
+      c.className = "cursor";
+      ultimo.appendChild(c);
+    }
+    aguardando = function () {
+      var cur = elTexto.querySelector(".cursor");
+      if (cur) cur.remove();
+      depois();
+    };
+  }
+
+  function apresenta(linhas, classe, depois, instantaneo) {
+    escreve(linhas, classe, function () { esperaNoTexto(depois); }, instantaneo);
+  }
+
+  document.addEventListener("click", function (e) {
+    if (digitacao) { pulos++; e.preventDefault(); e.stopPropagation(); completaTexto(); return; }
+    if (perg) { pulos++; e.preventDefault(); e.stopPropagation(); completaPergunta(); return; }
+    if (saindoTimer) { pulos++; e.preventDefault(); e.stopPropagation(); terminaSaida(); return; }
+    if (aguardando) {
+      e.preventDefault(); e.stopPropagation();
+      var f = aguardando; aguardando = null; f();
+    }
+  }, true);
+
+  // ================= MENU =================
+
+  function botao(texto, custo, onClick, classe) {
+    var b = document.createElement("button");
+    var s = document.createElement("span");
+    s.textContent = texto;
+    b.appendChild(s);
+    if (custo) {
+      var c = document.createElement("span");
+      c.className = "custo";
+      c.textContent = "-" + custo + " min";
+      b.appendChild(c);
+    }
+    if (classe) b.className = classe;
+    if (onClick) b.addEventListener("click", onClick);
+    else b.disabled = true;
+    return b;
+  }
+
+  function contaDescobertas() {
+    return DESCOBERTAS.filter(function (k) { return st.sabe[k]; }).length;
+  }
+
+  // apelido vem minúsculo ("a moça inquieta") pra caber no meio de frase;
+  // cap() sobe a primeira letra quando é botão ou começo de frase
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // "uma moça" enquanto estranha, "a moça" depois que o jogador já a viu:
+  // artigo definido pressupõe conhecer a pessoa
+  function nomeDe(id) {
+    var p = PESSOAS[id];
+    if (st.sabe["nome_" + id]) return p.nome;
+    var art = st.sabe["viu_" + id] ? (p.fem ? "a " : "o ") : (p.fem ? "uma " : "um ");
+    return art + p.apelido;
+  }
+
+  // pra cenas com gente que o jogador talvez nunca viu: nome > apelido > genérico
+  function quemE(id, generico) {
+    if (st.sabe["nome_" + id]) return PESSOAS[id].nome;
+    if (st.sabe["viu_" + id]) return (PESSOAS[id].fem ? "a " : "o ") + PESSOAS[id].apelido;
+    return generico;
+  }
+
+  // aparecer num texto conta como ter sido visto — o artigo muda a partir daqui
+  function marcaVistos(ids) {
+    ids.forEach(function (id) { st.sabe["viu_" + id] = true; });
+  }
+
+  function ondeEsta(id) {
+    var p = PESSOAS[id];
+    if (st.mortos[id]) return null;
+    if ((st.fugiu || {})[id]) return null;   // quem viu você matar não volta
+    if (id === "theo" && st.estourou) return st.theoLugar || null;
+    var m = minutos();
+    for (var i = 0; i < p.agenda.length; i++) {
+      var a = p.agenda[i];
+      if (m <= a[0] && m > a[1]) return a[2];
+    }
+    return null;
+  }
+
+  function pessoasAqui() {
+    return Object.keys(PESSOAS).filter(function (id) {
+      // caçando (theoLugar setado), o Théo não é gente pra conversar, é ameaça;
+      // sem estopim ele segue no quarto, de pato, conversável
+      if (id === "theo" && st.theoLugar) return false;
+      return ondeEsta(id) === st.lugar;
+    });
+  }
+
+  function coisasAqui() {
+    return Object.keys(COISAS).filter(function (id) {
+      var c = COISAS[id];
+      if (c.onde !== "*" && c.onde !== st.lugar) return false;
+      return c.inicial || st.conhece[id];
+    });
+  }
+
+  function assuntosCom(pid) {
+    return ASSUNTOS.filter(function (a) {
+      if (!st.sabe[a.exige] || !a.resp[pid]) return false;
+      // exigeTem: o assunto pede o objeto na mão, não só a lembrança dele
+      if (a.exigeTem && !(st.tem || {})[a.exigeTem]) return false;
+      return true;
+    });
+  }
+
+  function terminaSaida() {
+    if (!saindoTimer) return;
+    clearTimeout(saindoTimer);
+    saindoTimer = null;
+    elTexto.innerHTML = "";
+    elTexto.classList.remove("saindo");
+    elTexto.removeAttribute("style");
+    mostraMenu();
+  }
+
+  function avancaParaMenu() {
+    var cur = elOpcoes.querySelector(".pergunta .cursor");
+    if (cur) cur.remove();
+    if (!elTexto.childNodes.length) { mostraMenu(); return; }
+
+    var h = elTexto.getBoundingClientRect().height;
+    elTexto.classList.add("saindo");
+    elTexto.style.height = h + "px";
+    void elTexto.offsetWidth;
+    elTexto.style.transition = "opacity 240ms ease, height 380ms cubic-bezier(.4,0,.2,1)";
+    elTexto.style.opacity = "0";
+    elTexto.style.height = "0px";
+    var p = elOpcoes.querySelector(".pergunta");
+    if (p) p.classList.add("colado");
+    saindoTimer = setTimeout(terminaSaida, 0);
+  }
+
+  function relerUltima() {
+    if (!st.ultimas) return;
+    pintaLinhas(st.ultimas.linhas, st.ultimas.classe);
+    elOpcoes.innerHTML = "";
+    ultimaLinha = null;
+    window.scrollTo(0, 0);
+    perguntaAnimada("O que você faz?", function () { esperaClique(avancaParaMenu); });
+  }
+
+  function pedeAcao() {
+    perguntaAnimada("O que você faz?", function () { esperaClique(avancaParaMenu); });
+  }
+
+  function mostraMenu() {
+    var p = elOpcoes.querySelector(".pergunta");
+    if (!p) {
+      p = linhaPergunta("pergunta colado" + (st.cs <= 30000 ? " urgente" : ""));
+      p.textContent = "O que você faz?";
+      poeClockBig();
+    } else {
+      p.classList.add("colado");
+    }
+
+    var caixa = document.getElementById("botoes");
+    var nova = !caixa;
+    if (nova) {
+      caixa = document.createElement("div");
+      caixa.id = "botoes";
+      caixa.className = "entrando";
+      elOpcoes.appendChild(caixa);
+    }
+    caixa.innerHTML = "";
+
+    function grupo(id, rotulo, classe, monta) {
+      var aberto = st.aberto === id;
+      caixa.appendChild(botao("- " + rotulo, null, function () {
+        st.aberto = aberto ? null : id;
+        mostraMenu();
+      }, classe + (aberto ? " aberto" : "")));
+      if (aberto) monta();
+    }
+
+    // pessoas primeiro: é o que muda com o relógio
+    pessoasAqui().forEach(function (pid) {
+      var pes = PESSOAS[pid];
+      grupo("p_" + pid, cap(nomeDe(pid)), "grupo pessoa", function () {
+        caixa.appendChild(botao("observar", 1, function () {
+          executaPessoa(pid, "olhar", (pes.olharEm && pes.olharEm[st.lugar]) || pes.olhar);
+        }, "sub" + (st.vistos["p:" + pid + ":olhar"] ? " visto" : "")));
+        caixa.appendChild(botao("falar", 1, function () {
+          executaPessoa(pid, "falar", pes.falar);
+        }, "sub" + (st.vistos["p:" + pid + ":falar"] ? " visto" : "")));
+        if (!st.sabe["nome_" + pid]) {
+          caixa.appendChild(botao("perguntar o nome", 1, function () {
+            executaNome(pid);
+          }, "sub"));
+        }
+        assuntosCom(pid).forEach(function (a) {
+          caixa.appendChild(botao(a.label, a.custo, function () {
+            executaAssunto(pid, a);
+          }, "sub" + (st.vistos["a:" + pid + ":" + a.id] ? " visto" : "")));
+        });
+        // com uma arma na mão, toda conversa tem uma saída que não volta
+        if ((st.tem || {}).faca) {
+          caixa.appendChild(botao("atacar com a faca", 1, function () {
+            mata(pid, "faca");
+          }, "sub"));
+        }
+        if ((st.tem || {}).arma) {
+          caixa.appendChild(botao("atirar " + (pes.fem ? "nela" : "nele"), 1, function () {
+            mata(pid, "arma");
+          }, "sub"));
+        }
+      });
+    });
+
+    coisasAqui().forEach(function (cid) {
+      var c = COISAS[cid];
+      grupo(cid, c.nome, "grupo", function () {
+        c.acoes.forEach(function (a) {
+          if (a.exige && !st.sabe[a.exige]) return;
+          if (a.exigeConhece && !st.conhece[a.exigeConhece]) return;
+          // já está no bolso: a ação de pegar não tem mais o que oferecer
+          if (a.someAposPegar && (st.tem || {})[a.pega]) return;
+          // já tem tranca na porta (ou ninguém vivo lá dentro) — trancar não acrescenta nada
+          if (a.trava && (st.trancou || st.mortos["theo"])) return;
+          caixa.appendChild(botao(a.label, a.custo, function () {
+            executa(cid, a);
+          }, "sub" + (st.vistos[cid + ":" + a.id] ? " visto" : "")));
+        });
+      });
+    });
+
+    grupo("voce", VOCE.nome, "grupo", function () {
+      VOCE.acoes.forEach(function (a) {
+        if (a.someAposPegar && (st.tem || {})[a.pega]) return;
+        caixa.appendChild(botao(a.label, a.custo, function () {
+          executa("voce", a);
+        }, "sub" + (st.vistos["voce:" + a.id] ? " visto" : "")));
+      });
+    });
+
+    var saidas = (LUGARES[st.lugar].saidas || []).filter(function (s) {
+      return !s.exige || st.sabe[s.exige];
+    });
+    if (saidas.length) {
+      grupo("ir", "Ir para...", "grupo", function () {
+        saidas.forEach(function (s) {
+          caixa.appendChild(botao(s.label, s.custo, function () {
+            vaiPara(s.id, s.custo);
+          }, "sub"));
+        });
+      });
+    }
+
+    if (st.ultimas) caixa.appendChild(botao("↩ reler", null, relerUltima, "reler"));
+
+    if (nova) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { caixa.classList.remove("entrando"); });
+      });
+    }
+  }
+
+  // ================= AÇÕES =================
+
+  function depoisDaAcao() {
+    if (st.cs <= 0) { morre("tempo"); return; }
+    if (tentaEstopim()) return;
+    if (st.estourou && !st.pegou && st.theoLugar === st.lugar) {
+      st.pegou = true; theoTeAcha(); return;
+    }
+    pedeAcao();
+  }
+
+  function gasta(min) {
+    st.acoes++;
+    st.cs -= min * 6000;
+    if (st.cs < 0) st.cs = 0;
+    pintaRelogio();
+  }
+
+  function antesDeAgir() {
+    st.aberto = null;
+    if (!st.hudAtivo) { st.hudAtivo = true; voaProCanto(); }
+  }
+
+  // ===== MODO FLUXO: resumos estruturais no lugar da prosa =====
+  function nomeCoisa(id) {
+    return "[" + (COISAS[id] ? COISAS[id].nome : id) + "]";
+  }
+  function resumoLugar(id) {
+    var l = LUGARES[id];
+    var linhas = ["📍 " + l.nome.toUpperCase() +
+      ((l.revela || []).length ? " — " + l.revela.map(nomeCoisa).join(" ") : "")];
+    var sd = (l.saidas || []).map(function (s) { return s.label; }).join(" · ");
+    if (sd) linhas.push({ t: "⇢ saídas: " + sd, c: "eco" });
+    return linhas;
+  }
+  function resumoAcao(grupo, a, vazia) {
+    var dono = grupo === "voce" ? "Você" : (COISAS[grupo] ? COISAS[grupo].nome : grupo);
+    var e = [];
+    if (vazia) e.push("(1ª volta: memória ainda não vem)");
+    else {
+      if (a.sabe) e.push("descobre: " + a.sabe);
+      if (a.pega) e.push("pega: " + a.pega);
+      if (a.revela) e.push("revela " + a.revela.map(nomeCoisa).join(" "));
+      if (a.revelaNome) e.push("nomes: " + a.revelaNome.join(", "));
+      if (a.trava) e.push("🔒 TRANCA o quarto 2");
+    }
+    return ["▸ " + dono + " › " + a.label + (e.length ? "  —  " + e.join(" | ") : "")];
+  }
+
+  function poeGente(linhas) {
+    var ids = pessoasAqui();
+    var gente = ids.map(function (id) { return nomeDe(id); });
+    if (gente.length === 1) linhas.push("{" + cap(gente[0]) + "} está aqui.");
+    else if (gente.length > 1) {
+      var resto = gente.slice(1).map(function (n) { return "{" + n + "}"; });
+      linhas.push("{" + cap(gente[0]) + "}" +
+        (resto.length > 1 ? ", " + resto.slice(0, -1).join(", ") : "") +
+        " e " + resto[resto.length - 1] + " estão aqui.");
+    }
+    marcaVistos(ids);   // depois de montar: a frase atual ainda usa "um/uma"
+    return linhas;
+  }
+
+  // a agenda anda com o relógio: quem entrou ou saiu durante a ação é narrado,
+  // senão a pessoa se materializa no menu sem o texto nunca ter contado
+  function comMovimento(linhas, antesIds) {
+    var agora = pessoasAqui();
+    var extra = linhas.slice();
+    var vistos = [];
+    antesIds.forEach(function (id) {
+      if (agora.indexOf(id) < 0 && id !== "theo" && !st.mortos[id]) {
+        extra.push("{" + cap(nomeDe(id)) + "} sai.");
+        vistos.push(id);
+      }
+    });
+    agora.forEach(function (id) {
+      if (antesIds.indexOf(id) < 0 && id !== "theo") {
+        extra.push("{" + cap(nomeDe(id)) + "} entra.");
+        vistos.push(id);
+      }
+    });
+    marcaVistos(vistos);
+    return extra;
+  }
+
+  function vaiPara(destino, custo) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (destino === "quarto2" && st.trancou) {
+      gasta(custo);
+      apresenta([st.trancouCom === "sofa"
+                   ? "O sofá está entalado contra a porta, do jeito que você deixou. Nem você abre mais isso."
+                   : "A cadeira está encaixada na maçaneta. Você mesmo botou ali.",
+                 "Do lado de dentro, o quack continua."], null, depoisDaAcao);
+      return;
+    }
+    gasta(custo);
+    st.lugar = destino;
+    var l = LUGARES[destino];
+    if (l.revela) l.revela.forEach(function (id) { st.conhece[id] = true; });
+    pintaRelogio();
+
+    st.visitou = st.visitou || {};
+    st.visitou[destino] = true;
+    var linhas = resumoLugar(destino);   // MODO FLUXO
+
+    poeGente(linhas);
+
+    // o que o estopim deixou pra trás tem presença física, não só promessa.
+    // (os blocos do estopim só valem quando NÃO foi o jogador quem matou — corpoEm)
+    var corpos = st.corpoEm || {};
+    if (st.mortos["theo"] && !corpos["theo"] && destino === "quarto2") {
+      linhas.push({ t: cap(quemE("theo", "o dono do quack")) + " está no chão, entre o armário e a cama, do jeito que ficou. Você não chega mais perto.", c: "forte" });
+    }
+    if (st.mortos["tony"] && st.mortos["theo"] && destino === st.tonyParadoEm) {
+      linhas.push(cap(quemE("tony", "o homem da faca")) +
+        (destino === "quarto2"
+          ? " continua sentado na beirada da cama. Não olha pra você. Não olha pra nada."
+          : " está sentado no chão, encostado na parede, com a faca ainda na mão. Não olha pra você. Não olha pra nada."));
+    }
+    if (st.estourou && st.mortos["tony"] && !corpos["tony"] && !st.mortos["theo"] && destino === "quarto2") {
+      linhas.push({ t: "O corpo do " + quemE("tony", "outro") + " está caído perto da cama, com a mão fechada em volta de uma faca que não deu tempo de abrir.", c: "forte" });
+    }
+    // corpos que VOCÊ deixou ficam onde você os deixou
+    Object.keys(corpos).forEach(function (pid) {
+      if (corpos[pid] !== destino) return;
+      var pp = PESSOAS[pid];
+      linhas.push({ t: "O corpo d" + (pp.fem ? "a " : "o ") +
+        (st.sabe["nome_" + pid] ? pp.nome : pp.apelido) +
+        " está onde você deixou. A casa finge junto com você que não está.", c: "forte" });
+    });
+    // a casa esvazia depois do estopim (ou do que você fez) — dito uma vez por volta
+    if ((st.estourou || st.semEstopim) && !pessoasAqui().length && !st.avisoVazio &&
+        destino !== "quarto2" && destino !== "corredorQ2") {
+      st.avisoVazio = true;
+      linhas.push(st.trancou
+        ? "Ninguém. Só o quack, abafado, no fundo da casa — e você."
+        : (st.semEstopim
+          ? "Ninguém. Quem sobrou não ficou pra descobrir se era o próximo."
+          : "Ninguém. A casa depois do tiro é outra casa: os mesmos móveis, o dobro do tamanho, nenhuma voz."));
+    }
+
+    apresenta(linhas, null, depoisDaAcao);
+  }
+
+  // texto alternativo quando o estado do mundo desmente o texto fixo
+  function textoVivo(grupo, a) {
+    if (grupo === "maquina" && a.id === "olhar" && !st.sabe["moeda"]) {
+      // sem ter achado moeda nenhuma, o jogo não pode apontar a conexão por você
+      return [
+        "Três encaixes redondos e vazios, do tamanho de uma moeda grande.",
+        "Nenhum botão. Nenhum fio. Está morna."
+      ];
+    }
+    if (grupo === "som" && a.id === "ligar" && st.estourou) {
+      if (st.mortos["theo"]) return [
+        "Ainda tem bateria. Entra uma música alta demais pro tamanho da sala.",
+        "Ninguém grita pra abaixar. Ninguém vai gritar mais nada.",
+        "Você desliga."
+      ];
+      if (!st.trancou) return [
+        "Ainda tem bateria. Entra uma música alta demais pro tamanho da sala.",
+        "Você desliga no segundo seguinte, com o coração no ouvido.",
+        "Nessa casa, agora, barulho é endereço."
+      ];
+    }
+    if (grupo === "portaQ2" && a.id === "ouvir") {
+      if (st.mortos["theo"]) return [
+        "Nada.",
+        "Nenhum quack. Nenhum passo. Nada.",
+        "Você fica um tempo a mais com o ouvido colado, esperando o som voltar. Ele não volta."
+      ];
+      if (st.estourou && !st.trancou) return [
+        "Nada do outro lado.",
+        "O quarto está vazio. Quem fazia aquele som está solto na casa — com você."
+      ];
+    }
+    if (grupo === "voce" && a.id === "escutar") {
+      if (st.mortos["theo"]) return [
+        "Chuva. A torneira pingando.",
+        "O barulho que você não sabia nomear parou. A casa está mais silenciosa do que tem direito."
+      ];
+      if (st.estourou && !st.trancou) return [
+        "Chuva. A torneira.",
+        "E, em algum lugar da casa, um quack curto. Depois outro, mais perto de outra parede.",
+        "Está mudando de cômodo."
+      ];
+    }
+    if (grupo === "voce" && a.id === "gritar" && st.estourou) {
+      return [
+        "Você grita.",
+        "Nada para, porque não tem mais nada pra parar.",
+        "A chuva responde no telhado. Só ela."
+      ];
+    }
+    return null;
+  }
+
+  function executa(grupo, a) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (a.vaiPara) {
+      if (a.sabe) st.sabe[a.sabe] = true;
+      st.vistos[grupo + ":" + a.id] = true;
+      vaiPara(a.vaiPara, a.custo);
+      return;
+    }
+
+    if (a.dorme) {
+      st.dormiu++;
+      gasta(a.custo);
+      if (st.dormiu === 1) {
+        st.sabe["sem_sono"] = true;
+        apresenta(["▸ Você › dormir (1ª vez)  —  descobre: sem_sono; a 2ª vez MATA"],
+                  null, depoisDaAcao);
+        return;
+      }
+      escreve(["☠ dormir (2ª vez) — apaga → volta nova"], null, function () {
+        setTimeout(function () { morre("dormiu"); }, 200);
+      });
+      return;
+    }
+
+    if (a.olharVolta) {
+      gasta(a.custo);
+      var l = LUGARES[st.lugar];
+      if (l.revela) l.revela.forEach(function (id) { st.conhece[id] = true; });
+      // olhar em volta apresenta o cômodo de verdade: conta como visita e mostra quem está
+      st.visitou = st.visitou || {};
+      st.visitou[st.lugar] = true;
+      apresenta(poeGente(resumoLugar(st.lugar)), null, depoisDaAcao);
+      return;
+    }
+
+    if (a.encaixa) { encaixaMoedas(a.custo); return; }
+
+    if (a.espia) {
+      gasta(a.custo);
+      st.sabe["viu_sala"] = true;
+      st.vistos[grupo + ":" + a.id] = true;
+      var la = Object.keys(PESSOAS).filter(function (id) { return ondeEsta(id) === "sala"; });
+      var linhas = [
+        "👁 espiada pela fresta  —  descobre: viu_sala; mostra QUEM está na sala agora:"
+      ];
+      if (la.length === 1) {
+        linhas.push("{" + cap(nomeDe(la[0])) + "} está lá. Não olhou pra cá.");
+      } else if (la.length > 1) {
+        var nn = la.map(function (id) { return nomeDe(id); });
+        var rr = nn.slice(1).map(function (n) { return "{" + n + "}"; });
+        linhas.push("{" + cap(nn[0]) + "}" +
+          (rr.length > 1 ? ", " + rr.slice(0, -1).join(", ") : "") +
+          " e " + rr[rr.length - 1] + " estão lá.");
+      } else {
+        linhas.push("Não dá pra ver ninguém daqui. As vozes vinham de algum lugar mais fundo.");
+      }
+      marcaVistos(la);   // espiar também apresenta
+      apresenta(linhas, null, depoisDaAcao);
+      return;
+    }
+
+    var chave = grupo + ":" + a.id;
+    var jaViu = st.vistos[chave];
+    st.vistos[chave] = true;
+    var antesGente = pessoasAqui();
+
+    var vazia = a.txtPrimeira && st.volta < 2;
+    var linhas = resumoAcao(grupo, a, vazia);   // MODO FLUXO
+    if (textoVivo(grupo, a)) linhas[0] += "  ≈(texto muda: estado do mundo)";
+    jaViu = false;
+
+    if (a.sabe && !vazia) st.sabe[a.sabe] = true;
+    if (a.pega) st.tem = (st.tem || {}), st.tem[a.pega] = true;
+    if (a.revela) a.revela.forEach(function (id) { st.conhece[id] = true; });
+    if (a.revelaNome && !vazia) {
+      a.revelaNome.forEach(function (id) { st.sabe["nome_" + id] = true; });
+    }
+    if (a.trava) {
+      st.trancou = true;   // físico: não atravessa o loop
+      st.trancouCom = grupo === "sofa" ? "sofa" : "cadeira";
+    }
+
+    gasta(a.custo);
+
+    if (jaViu) apresenta(comMovimento([linhas[linhas.length - 1]], antesGente), "eco", depoisDaAcao, true);
+    else apresenta(comMovimento(linhas, antesGente), a.eco ? "eco" : null, depoisDaAcao);
+  }
+
+  // o menu pode estar aberto há tempo — a pessoa clicada talvez já tenha saído
+  function seFoiEmbora(pid) {
+    if (ondeEsta(pid) === st.lugar) return false;
+    st.aberto = null;
+    apresenta(["Você se vira pra falar — e " + nomeDe(pid) + " já não está mais aqui."],
+              "eco", depoisDaAcao, true);
+    return true;
+  }
+
+  function executaPessoa(pid, tipo, linhas) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (seFoiEmbora(pid)) return;
+    var chave = "p:" + pid + ":" + tipo;
+    var jaViu = st.vistos[chave];
+    st.vistos[chave] = true;
+    st.sabe["viu_" + pid] = true;
+    var antesGente = pessoasAqui();
+    var rn = PESSOAS[pid].revelaNome;
+    if (tipo === "falar" && rn) rn.forEach(function (o) { st.sabe["nome_" + o] = true; });
+    gasta(1);
+    // MODO FLUXO: só o esqueleto da interação
+    var resumo = "👤 " + cap(nomeDe(pid)) + " › " + tipo +
+      (tipo === "falar" && rn ? "  —  revela nome: " + rn.join(", ") : "");
+    apresenta(comMovimento([resumo], antesGente), null, depoisDaAcao);
+  }
+
+  function executaNome(pid) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (seFoiEmbora(pid)) return;
+    var p = PESSOAS[pid];
+    st.sabe["nome_" + pid] = true;
+    st.vistos["p:" + pid + ":nome"] = true;
+    gasta(1);
+    var linhas = ["👤 perguntar o nome  —  revela: " + p.nome];
+    if (pid === "theo") {
+      linhas = ["👤 perguntar o nome  —  não responde (quack); o nome dele vem por outros"];
+      st.sabe["nome_theo"] = false;
+      delete st.sabe["nome_theo"];
+    }
+    apresenta(linhas, null, depoisDaAcao);
+  }
+
+  function executaAssunto(pid, a) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (seFoiEmbora(pid)) return;
+    var chave = "a:" + pid + ":" + a.id;
+    var jaViu = st.vistos[chave];
+    st.vistos[chave] = true;
+    st.sabe["falou_" + a.id] = true;
+    if (a.gatilho) st.sabe[a.gatilho] = true;
+    var antesGente = pessoasAqui();
+    // só a resposta que FALA o nome revela o nome
+    if (a.nomes && a.nomes[pid]) {
+      a.nomes[pid].forEach(function (id) { st.sabe["nome_" + id] = true; });
+    }
+    if (a.dá && pid === "jennifer") { st.tem = (st.tem || {}); st.tem["moeda_jennifer"] = true; }
+    gasta(a.custo);
+    // MODO FLUXO: assunto vira efeito
+    var e = [];
+    if (a.nomes && a.nomes[pid]) e.push("revela nome: " + a.nomes[pid].join(", "));
+    if (a.dá && pid === "jennifer") e.push("🪙 GANHA " + a.dá);
+    if (a.gatilho) e.push("gatilho: " + a.gatilho + " (sem consumidor ainda)");
+    var resumo = "💬 " + cap(nomeDe(pid)) + " › " + a.label +
+      (e.length ? "  —  " + e.join(" | ") : "  —  (só cor)");
+    apresenta(comMovimento([resumo], antesGente), null, depoisDaAcao);
+  }
+
+  function quantasMoedas() {
+    var t = st.tem || {};
+    return (t.moeda_bolso ? 1 : 0) + (t.moeda_cama ? 1 : 0) + (t.moeda_jennifer ? 1 : 0);
+  }
+
+  function encaixaMoedas(custo) {
+    gasta(custo);
+    var n = quantasMoedas();
+    if (n === 0) {
+      apresenta(["Você não tem nenhuma moeda no bolso."], "eco", depoisDaAcao, true);
+      return;
+    }
+    if (n < 3) {
+      apresenta(["Você encaixa o que tem. " + n + " de 3.",
+                 "Os encaixes vazios continuam vazios, e a máquina continua morna."],
+                null, depoisDaAcao);
+      return;
+    }
+    st.acabou = true;
+    escreve([
+      { t: "🏁 3/3 moedas — FIM: o relógio para e sai do pulso.", c: "forte" },
+      { t: "— fim do teste —", c: "eco" }
+    ], null, placar);
+  }
+
+  // ---- matar com a faca ou a arma
+
+  function cenaMatar(pid, com) {
+    var quem = nomeDe(pid);
+    return [
+      { t: "🔪 VOCÊ MATOU " + cap(quem) + " (" + com + ").  —  corpo fica neste cômodo; " +
+           (pid === "tony" || pid === "theo" ? "SEM estopim às 16:00; " : "") +
+           "quem viu foge de vez", c: "forte" }
+    ];
+  }
+
+  function mata(pid, com) {
+    if (st.acabou) return;
+    antesDeAgir();
+    if (seFoiEmbora(pid)) return;
+    gasta(1);
+    st.sabe["viu_" + pid] = true;
+    st.mortos[pid] = true;
+    st.corpoEm = st.corpoEm || {};
+    st.corpoEm[pid] = st.lugar;
+    st.fugiu = st.fugiu || {};
+
+    var linhas = cenaMatar(pid, com).slice();
+    pessoasAqui().forEach(function (o) {
+      st.sabe["viu_" + o] = true;
+      if (o === "theo") {
+        linhas.push("(o Théo viu — não entende, não foge)");
+        return;
+      }
+      st.fugiu[o] = true;
+      linhas.push({ t: "→ testemunha: {" + cap(nomeDe(o)) + "} FOGE e some do jogo nesta volta.", c: "forte" });
+    });
+    apresenta(linhas, null, depoisDaAcao);
+  }
+
+  // ---- o estopim das 16
+
+  // o tiro das 16:00 precisa dos dois vivos e presentes: sem provocador
+  // (Tony) ou sem provocado (Théo), aquela briga simplesmente nunca acontece
+  function tentaEstopim() {
+    if (st.estourou || st.semEstopim) return false;
+    if (st.cs > ESTOPIM) return false;
+    var f = st.fugiu || {};
+    if (st.mortos["tony"] || st.mortos["theo"] || f["tony"] || f["theo"]) {
+      st.semEstopim = true;
+      return false;
+    }
+    estopim();
+    return true;
+  }
+
+  function estopim() {
+    st.estourou = true;
+    st.theoLugar = "quarto2";
+    var trancado = st.trancou;
+    var vcTemArma = (st.tem || {}).arma;
+    var dentro = st.lugar === "quarto2";
+
+    // você está NO quarto quando o Tony chega — a cena acontece na sua frente
+    if (dentro) {
+      // a fala do Tony entrega o nome do Théo — é assim que nome se aprende
+      var tony1 = quemE("tony", "um homem sem camisa");
+      st.sabe["nome_theo"] = true;
+
+      if (vcTemArma) {
+        st.mortos["theo"] = true;
+        st.mortos["tony"] = true;
+        st.theoLugar = null;
+        st.tonyParadoEm = "quarto2";
+        st.lugar = "corredorQ2";           // o texto te tira do quarto — o estado acompanha
+        st.visitou = st.visitou || {};
+        st.visitou["corredorQ2"] = true;
+        pintaRelogio();
+        apresenta([
+          { t: "💥 16:00 ESTOPIM (você DENTRO do quarto 2, COM a arma): Tony invade, Théo desarmado, Tony mata o Théo com a faca e fica catatônico. Você é empurrado pro corredor.", c: "forte" },
+          { t: "efeitos: mortos: théo + tony(catatônico no quarto2) | sem caçada | nome do Théo revelado", c: "eco" }
+        ], null, depoisDaAcao);
+        return;
+      }
+
+      st.mortos["tony"] = true;
+      apresenta([
+        { t: "💥 16:00 ESTOPIM (você DENTRO do quarto 2, sem arma): Tony invade e provoca, Théo pega o revólver no armário e atira no Tony na sua frente.", c: "forte" },
+        { t: "efeitos: tony morto | Théo sai CAÇANDO pela casa (sala→banheiro→cozinha→quarto) | nome do Théo revelado", c: "eco" }
+      ], null, depoisDaAcao);
+      return;
+    }
+
+    if (trancado) {
+      st.theoLugar = null;
+      st.sabe["nome_theo"] = true;
+      apresenta([
+        { t: "💥 16:00 ESTOPIM (porta TRANCADA com " + (st.trancouCom === "sofa" ? "o sofá" : "a cadeira") + "): o Tony bate, xinga, desiste. Ninguém morre.", c: "forte" },
+        { t: "efeitos: Théo segue vivo trancado (quack) | nome do Théo revelado | casa esvazia depois", c: "eco" }
+      ], null, depoisDaAcao);
+      return;
+    }
+
+    if (vcTemArma) {
+      st.mortos["theo"] = true;
+      st.mortos["tony"] = true;
+      st.theoLugar = null;
+      st.tonyParadoEm = "corredorQ2";
+      apresenta([
+        { t: "💥 16:00 ESTOPIM (você COM a arma, fora do quarto): Théo desarmado — o Tony mata o Théo com a faca e senta no corredor, catatônico.", c: "forte" },
+        { t: "efeitos: mortos: théo + tony(catatônico no corredor) | sem caçada", c: "eco" }
+      ], null, depoisDaAcao);
+      return;
+    }
+
+    st.mortos["tony"] = true;
+    st.sabe["nome_theo"] = true;
+    apresenta([
+      { t: "💥 16:00 ESTOPIM (padrão): Tony provoca, Théo atira. Tony morto.", c: "forte" },
+      { t: "efeitos: Théo sai CAÇANDO (16-12 sala, 12-8 banheiro, 8-4 cozinha, 4-0 quarto) | nome do Théo revelado", c: "eco" }
+    ], null, depoisDaAcao);
+  }
+
+  function theoTeAcha() {
+    if (saindoTimer) { clearTimeout(saindoTimer); saindoTimer = null; }
+    apresenta([
+      { t: "☠ O THÉO TE ACHOU (rota da caçada bateu com o seu cômodo).", c: "forte" },
+      { t: "3 opções (4 com a faca) — todas morrem. É beco: a saída era não estar aqui.", c: "eco" }
+    ], null, function () {
+      perguntaAnimada("O que você faz?", function () {
+        esperaClique(function () {
+          elTexto.innerHTML = "";
+          elOpcoes.innerHTML = "";
+          var p = document.createElement("div");
+          p.className = "pergunta colado urgente";
+          p.textContent = "O que você faz?";
+          elOpcoes.appendChild(p);
+          var ops = [["- Falar com ele", "theo_falar"],
+                     ["- Empurrar e correr", "theo_corre"],
+                     ["- Ficar parado", "theo_para"]];
+          if ((st.tem || {}).faca) ops.push(["- Partir pra cima com a faca", "theo_faca"]);
+          ops.forEach(function (par) {
+            elOpcoes.appendChild(botao(par[0], null, function () { morre(par[1]); }, "grupo"));
+          });
+        });
+      });
+    });
+  }
+
+  // rota de caça do Théo, depois do estopim
+  function atualizaTheo() {
+    if (!st.estourou || st.acabou || st.pegou) return;
+    if (st.mortos["theo"] || st.theoLugar === null) return;
+    var m = minutos();
+    var rota = [[16, 12, "sala"], [12, 8, "banheiro"], [8, 4, "cozinha"], [4, 0, "quarto1"]];
+    for (var i = 0; i < rota.length; i++) {
+      if (m <= rota[i][0] && m > rota[i][1]) { st.theoLugar = rota[i][2]; break; }
+    }
+    // ele te acha na hora — mas nunca por cima de um texto que você está lendo
+    if (st.theoLugar === st.lugar && !ocupado()) {
+      st.pegou = true;
+      theoTeAcha();
+    }
+  }
+  setInterval(atualizaTheo, 500);
+
+  // ================= LOOP =================
+
+  // MODO FLUXO: mortes viram rótulo de uma linha
+  var CENAS_MORTE = {
+    theo_falar: [{ t: "☠ MORTE: falar com ele → tiro.", c: "forte" }],
+    theo_corre: [{ t: "☠ MORTE: correr → tiro pelas costas.", c: "forte" }],
+    theo_para:  [{ t: "☠ MORTE: ficar parado → tiro na testa.", c: "forte" }],
+    theo_faca:  [{ t: "☠ MORTE: faca contra revólver → tiro.", c: "forte" }],
+    tempo:      [{ t: "☠ MORTE: 00:00:00 — o relógio zera.", c: "forte" }]
+  };
+
+  function morre(causa) {
+    if (st.morrendo) return;   // dois cliques não valem duas voltas
+    st.morrendo = true;
+    aguardando = null;
+    if (saindoTimer) { clearTimeout(saindoTimer); saindoTimer = null; }
+    st.pausado = true;
+
+    var cena = CENAS_MORTE[causa];
+    if (cena) apresenta(cena.slice(), null, function () { clarao(causa); });
+    else clarao(causa);
+  }
+
+  function clarao(causa) {
+    aguardando = null;
+    elFlash.classList.remove("bate");
+    void elFlash.offsetWidth;
+    elFlash.classList.add("bate");
+
+    var fala = {
+      theo_falar: "Ele para de dançar.",
+      theo_corre: "Ele para de dançar.",
+      theo_para: "Ele para de dançar.",
+      theo_faca: "Ele para de dançar.",
+      tempo: "O relógio chega no fim.",
+      dormiu: "Você apagou."
+    }[causa] || "";
+
+    setTimeout(function () {
+      st.volta++;
+      st.cs = TOTAL;
+      st.lugar = "quarto1";
+      st.pausado = false;
+      st.estourou = false;
+      st.theoLugar = null;
+      st.pegou = false;
+      st.trancou = false;
+      st.morrendo = false;
+      st.avisoVazio = false;
+      st.tonyParadoEm = null;
+      st.trancouCom = null;
+      st.semEstopim = false;
+      st.fugiu = {};
+      st.corpoEm = {};
+      st.mortos = {};
+      st.dormiu = 0;
+      st.vistos = {};
+      st.tem = {};
+      st.visitou = {};
+      st.aberto = null;
+      // porta_aberta é físico disfarçado de conhecimento: o loop fecha a porta
+      delete st.sabe["porta_aberta"];
+      pintaRelogio();
+      abre(fala);
+    }, 100);
+  }
+
+  function abre(antes) {
+    jogoComecou = true;
+    st.perguntou = false;
+    var linhas;
+    if (st.volta > 1) {
+      linhas = [];
+      if (antes) linhas.push({ t: antes, c: "eco" });
+      linhas.push({ t: "🔁 VOLTA " + st.volta + " — reset físico (itens/trancas/mortes voltam); conhecimento fica.", c: "forte" });
+    } else {
+      linhas = ABERTURA.slice();
+    }
+    apresenta(linhas, null, pedeAcao);
+  }
+
+  function placar() {
+    st.acabou = true;
+    apagaSave();   // o loop acabou: quem reabrir começa uma história nova
+    var p = document.createElement("div");
+    p.className = "placar";
+    salvaTempo();
+    manda("zerou");
+    var seg = Math.round(msJogados() / 1000);
+    var mm = Math.floor(seg / 60), ss = seg % 60;
+    var jogando = (mm > 0 ? mm + " min " : "") + ss + " s";
+
+    p.innerHTML =
+      "você jogou por: <b>" + jogando + "</b><br>" +
+      "vezes que você abriu: <b>" + vezes + "</b><br>" +
+      "voltas do loop: <b>" + st.volta + "</b><br>" +
+      "coisas descobertas: <b>" + contaDescobertas() + " de " + TOTAL_DESCOBERTAS + "</b><br>" +
+      "ações gastas: <b>" + st.acoes + "</b><br>" +
+      "tempo que sobrou no relógio: <b>" + relogio() + "</b>";
+    elTexto.appendChild(p);
+
+    var q = document.createElement("p");
+    q.className = "eco";
+    q.textContent = "Teve alguma hora em que você quis fazer alguma coisa que não estava na lista? O quê?";
+    elTexto.appendChild(q);
+
+    elOpcoes.innerHTML = "";
+    elOpcoes.appendChild(botao("- Recomeçar do zero", null, function () {
+      st = { cs: TOTAL, volta: 1, lugar: "quarto1", sabe: {}, conhece: {}, vistos: {},
+             mortos: {}, tem: {}, visitou: {}, acabou: false, estourou: false,
+             dormiu: 0, acoes: 0, morrendo: false, trancou: false,
+             perguntou: false, aberto: null, hudAtivo: true, pausado: false };
+      pintaRelogio();
+      abre("");
+    }, "grupo"));
+  }
+
+  // ================= BOOT =================
+
+  // volta anterior no aparelho: a pessoa escolhe se acorda lembrando ou do zero.
+  // só oferece se houve descoberta de verdade — intro abandonada não conta.
+  function telaContinuar(save) {
+    var achou = DESCOBERTAS.filter(function (k) { return save.sabe[k]; }).length;
+    pintaLinhas([
+      { t: "Você já acordou aqui antes." },
+      { t: "volta " + save.volta + " — " + achou + " de " + TOTAL_DESCOBERTAS + " coisas descobertas.", c: "eco" }
+    ]);
+    elOpcoes.innerHTML = "";
+    elOpcoes.appendChild(botao("- Continuar lembrando", null, function () {
+      st.sabe = save.sabe;
+      st.conhece = save.conhece;
+      st.volta = save.volta + 1;   // fechar o jogo também foi uma morte
+      delete st.sabe["porta_aberta"];   // físico não volta nem pelo save
+      st.hudAtivo = true;
+      st.pausado = false;
+      elClock.classList.remove("escondido");
+      elOpcoes.innerHTML = "";
+      pintaRelogio();
+      abre("");
+    }, "grupo"));
+    elOpcoes.appendChild(botao("- Esquecer tudo e recomeçar", null, function () {
+      apagaSave();
+      elOpcoes.innerHTML = "";
+      abre("");
+    }, "grupo"));
+  }
+
+  elClock.classList.add("escondido");
+  pintaRelogio();
+  var saveAnterior = leSave();
+  if (saveAnterior && DESCOBERTAS.some(function (k) { return saveAnterior.sabe[k]; })) {
+    telaContinuar(saveAnterior);
+  } else {
+    abre("");
+  }
+})();
+</script>
