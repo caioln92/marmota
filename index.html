@@ -665,7 +665,9 @@
       ],
       curta: ["Seu quarto. A cama desfeita de um lado só."],
       revela: ["cama", "armario", "celular", "copo", "portaQuarto"],
-      saidas: [{ id: "sala", label: "ir pra sala", custo: 1, exige: "viu_sala" }]
+      // examinar a porta já libera sair; abrir/espiar viram reconhecimento opcional.
+      // "sair do quarto" e não "ir pra sala": quem só tocou a porta não sabe o que tem lá
+      saidas: [{ id: "sala", label: "sair do quarto", custo: 1, exige: "porta_quarto" }]
     },
     sala: {
       nome: "Sala",
