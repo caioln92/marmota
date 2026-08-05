@@ -307,7 +307,7 @@
     return msAcum + (visivel ? Date.now() - ultimoTique : 0);
   }
 
-  setInterval(salvaTempo, 5000);
+  setInterval(function () { salvaTempo(); salvaJogo(); }, 5000);
   // este ouvinte tem que vir ANTES do que manda o placar: fecha o pedaço com o
   // estado antigo e só então vira a chave
   document.addEventListener("visibilitychange", function () {
@@ -315,6 +315,27 @@
     visivel = !document.hidden;
     ultimoTique = Date.now();
   });
+
+  // ---- o conhecimento sobrevive a fechar o jogo, igual sobrevive ao loop ----
+  // fechar é só mais um jeito de morrer: sabe/conhece/volta ficam, o físico não
+  var CHAVE_SAVE = "marmota.save";
+  var jogoComecou = false;
+
+  function salvaJogo() {
+    if (!jogoComecou || st.acabou) return;
+    try {
+      localStorage.setItem(CHAVE_SAVE, JSON.stringify(
+        { v: 1, volta: st.volta, sabe: st.sabe, conhece: st.conhece }));
+    } catch (e) {}
+  }
+  function apagaSave() { try { localStorage.removeItem(CHAVE_SAVE); } catch (e) {} }
+  function leSave() {
+    try {
+      var s = JSON.parse(localStorage.getItem(CHAVE_SAVE) || "null");
+      if (s && s.v === 1 && s.sabe && s.conhece) return s;
+    } catch (e) {}
+    return null;
+  }
 
   // id anônimo só pra distinguir aparelhos — nenhum dado pessoal
   var JOGADOR = (function () {
@@ -384,6 +405,7 @@
     if (jaMandouSaiu) return;
     jaMandouSaiu = true;
     salvaTempo();
+    salvaJogo();
     manda("saiu");
   }
   window.addEventListener("pagehide", mandaSaiu);
@@ -1964,6 +1986,7 @@
   }
 
   function abre(antes) {
+    jogoComecou = true;
     st.perguntou = false;
     var linhas;
     if (st.volta > 1) {
@@ -1981,6 +2004,7 @@
 
   function placar() {
     st.acabou = true;
+    apagaSave();   // o loop acabou: quem reabrir começa uma história nova
     var p = document.createElement("div");
     p.className = "placar";
     salvaTempo();
@@ -2016,8 +2040,41 @@
 
   // ================= BOOT =================
 
+  // volta anterior no aparelho: a pessoa escolhe se acorda lembrando ou do zero.
+  // só oferece se houve descoberta de verdade — intro abandonada não conta.
+  function telaContinuar(save) {
+    var achou = DESCOBERTAS.filter(function (k) { return save.sabe[k]; }).length;
+    pintaLinhas([
+      { t: "Você já acordou aqui antes." },
+      { t: "volta " + save.volta + " — " + achou + " de " + TOTAL_DESCOBERTAS + " coisas descobertas.", c: "eco" }
+    ]);
+    elOpcoes.innerHTML = "";
+    elOpcoes.appendChild(botao("- Continuar lembrando", null, function () {
+      st.sabe = save.sabe;
+      st.conhece = save.conhece;
+      st.volta = save.volta + 1;   // fechar o jogo também foi uma morte
+      delete st.sabe["porta_aberta"];   // físico não volta nem pelo save
+      st.hudAtivo = true;
+      st.pausado = false;
+      elClock.classList.remove("escondido");
+      elOpcoes.innerHTML = "";
+      pintaRelogio();
+      abre("");
+    }, "grupo"));
+    elOpcoes.appendChild(botao("- Esquecer tudo e recomeçar", null, function () {
+      apagaSave();
+      elOpcoes.innerHTML = "";
+      abre("");
+    }, "grupo"));
+  }
+
   elClock.classList.add("escondido");
   pintaRelogio();
-  abre("");
+  var saveAnterior = leSave();
+  if (saveAnterior && DESCOBERTAS.some(function (k) { return saveAnterior.sabe[k]; })) {
+    telaContinuar(saveAnterior);
+  } else {
+    abre("");
+  }
 })();
 </script>
